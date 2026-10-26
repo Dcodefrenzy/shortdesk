@@ -7,31 +7,63 @@ import (
 	"io"
 	"io/fs"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/shortdesk/shortdesk/images"
 )
 
-// Images Shortdesk builds from the recipes embedded in the binary.
-var builtImages = []struct{ Name, Dir string }{
-	{"shortdesk/desk:dev", "desk"},
-	{"shortdesk/vault-cli:dev", "vault-cli"},
+// Registry is where releases publish Shortdesk's images. Set at build time with
+// -ldflags "-X github.com/shortdesk/shortdesk/internal/stack.Registry=...".
+var Registry = "ghcr.io/dcodefrenzy"
+
+// Shortdesk's images: the local name charters and the vault use, the name each release
+// publishes it under, and the recipe embedded in the binary.
+var builtImages = []struct{ Name, Published, Dir string }{
+	{"shortdesk/desk:dev", "shortdesk-desk", "desk"},
+	{"shortdesk/vault-cli:dev", "shortdesk-vault-cli", "vault-cli"},
 }
 
-// ensureImages builds any missing image from its embedded recipe.
-func ensureImages(ctx context.Context, rebuild bool, log func(string, ...any)) error {
+// ensureImages makes sure each image exists locally. A release downloads the images
+// published with it (and again after an upgrade); any other build, or a release
+// whose download fails, builds them from the embedded recipes instead.
+func ensureImages(ctx context.Context, version string, rebuild bool, log func(string, ...any)) error {
 	for _, img := range builtImages {
-		if !rebuild {
+		if !rebuild && releaseVersion.MatchString(version) {
+			remote := Registry + "/" + img.Published + ":" + strings.TrimPrefix(version, "v")
+			if sameImage(ctx, img.Name, remote) {
+				continue
+			}
+			log("Downloading %s (first time only)…", remote)
+			if _, err := docker(ctx, "pull", "-q", remote); err == nil {
+				if _, err := docker(ctx, "tag", remote, img.Name); err != nil {
+					return err
+				}
+				continue
+			} else {
+				log("Couldn't download it (%v); building it here instead.", err)
+			}
+		} else if !rebuild {
 			if _, err := docker(ctx, "image", "inspect", img.Name); err == nil {
 				continue
 			}
 		}
-		log("Building %s (first time only; this can take several minutes)…", img.Name)
+		log("Building %s (this can take several minutes)…", img.Name)
 		if err := buildImage(ctx, img.Name, img.Dir); err != nil {
 			return fmt.Errorf("build %s: %w", img.Name, err)
 		}
 	}
 	return nil
+}
+
+// releaseVersion matches tagged releases (v1.2.3, v1.2.3-rc.1), not local builds.
+var releaseVersion = regexp.MustCompile(`^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$`)
+
+// sameImage reports whether both names exist locally and are the same image.
+func sameImage(ctx context.Context, a, b string) bool {
+	idA, errA := docker(ctx, "image", "inspect", "-f", "{{.Id}}", a)
+	idB, errB := docker(ctx, "image", "inspect", "-f", "{{.Id}}", b)
+	return errA == nil && errB == nil && idA == idB
 }
 
 // buildImage streams an embedded directory to `docker build` as its build context.

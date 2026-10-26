@@ -2,7 +2,7 @@
 # Every field Shortdesk does not support yet is rejected, so this file is the
 # full list of what a charter can say today.
 charter: assistant
-tenant: ayo
+tenant: personal
 version: 1
 
 desk:

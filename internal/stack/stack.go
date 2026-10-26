@@ -38,11 +38,12 @@ type Stack struct {
 // Options configure Up.
 type Options struct {
 	Dir           string // ~/.shortdesk
+	Version       string // this binary's version; "dev" builds images instead of downloading
 	RebuildImages bool
 	Log           func(format string, args ...any)
 }
 
-// Up checks Docker, builds missing images and (re)starts OpenSandbox.
+// Up checks Docker, gets missing images and (re)starts OpenSandbox.
 func Up(ctx context.Context, o Options) (Stack, error) {
 	if o.Log == nil {
 		o.Log = func(string, ...any) {}
@@ -53,7 +54,7 @@ func Up(ctx context.Context, o Options) (Stack, error) {
 	}
 	desktop := strings.Contains(osName, "Docker Desktop")
 
-	if err := ensureImages(ctx, o.RebuildImages, o.Log); err != nil {
+	if err := ensureImages(ctx, o.Version, o.RebuildImages, o.Log); err != nil {
 		return Stack{}, err
 	}
 

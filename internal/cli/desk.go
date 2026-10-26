@@ -45,7 +45,7 @@ func newDeskUpCommand() *cobra.Command {
 		Use:   "up",
 		Short: "Start a desk from a charter",
 		Example: `  shortdesk desk up --charter charters/examples/assistant.yaml
-  shortdesk desk up --charter charters/examples/assistant.yaml --name ayo --open`,
+  shortdesk desk up --charter charters/examples/assistant.yaml --name research --open`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			c, err := charter.Load(charterPath)

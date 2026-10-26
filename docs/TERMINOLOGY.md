@@ -48,7 +48,7 @@ limits:
 ```
 
 ### Tenant ✅ (label only) · 🔜 (full)
-A person, team or company using Shortdesk, e.g. `ayo`, `pollen`, `perto`. Tenants never see each other's desks, accounts, keys or bills. Today it's a label on desks; later it controls access, budgets and the vault.
+A person, team or company using Shortdesk, e.g. `personal`, `acme`, `my-team`. Tenants never see each other's desks, accounts, keys or bills. Today it's a label on desks; later it controls access, budgets and the vault.
 *Analogy:* separate companies renting space in the same building.
 
 ---

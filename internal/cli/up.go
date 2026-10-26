@@ -18,7 +18,7 @@ func newUpCommand() *cobra.Command {
 		Short: "Start Shortdesk: everything it needs, then the dashboard",
 		Long: `Start Shortdesk on this machine. Needs only Docker.
 
-On first run this builds the desk images (several minutes), then it starts OpenSandbox
+On first run this downloads the desk images (a few minutes), then it starts OpenSandbox
 (which creates and guards desks), the vault, and the dashboard. Everything is configured
 automatically and kept in ~/.shortdesk. Run it again any time; it picks up where it left off.`,
 		Args: cobra.NoArgs,
@@ -30,6 +30,7 @@ automatically and kept in ~/.shortdesk. Run it again any time; it picks up where
 			out := cmd.OutOrStdout()
 			if _, err := stack.Up(cmd.Context(), stack.Options{
 				Dir:           filepath.Join(home, ".shortdesk"),
+				Version:       Version,
 				RebuildImages: rebuild,
 				Log:           func(f string, a ...any) { fmt.Fprintf(out, f+"\n", a...) },
 			}); err != nil {
@@ -45,7 +46,7 @@ automatically and kept in ~/.shortdesk. Run it again any time; it picks up where
 		},
 	}
 	cmd.Flags().StringVar(&o.addr, "addr", "127.0.0.1:7070", "dashboard address")
-	cmd.Flags().BoolVar(&rebuild, "rebuild-images", false, "rebuild the desk images even if they exist")
+	cmd.Flags().BoolVar(&rebuild, "rebuild-images", false, "build the desk images here instead of downloading them")
 	cmd.Flags().BoolVar(&noOpen, "no-open", false, "don't open the dashboard in the browser")
 	return cmd
 }

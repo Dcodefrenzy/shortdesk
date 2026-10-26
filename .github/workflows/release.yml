@@ -1,0 +1,100 @@
+# Publishes a release when a version tag (v1.2.3) is pushed:
+#   1. the desk and vault-cli images, for amd64 and arm64, to ghcr.io
+#   2. the shortdesk binary for macOS, Linux and Windows, as GitHub release downloads
+# The release is created last, so the install scripts never find a release whose
+# images aren't published yet.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  image:
+    strategy:
+      matrix:
+        image: [desk, vault-cli]
+        arch: [amd64, arm64]
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Names
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/shortdesk-${{ matrix.image }}" >> "$GITHUB_ENV"
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: images/${{ matrix.image }}
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          provenance: false
+          tags: ${{ env.IMAGE }}:${{ env.VERSION }}-${{ matrix.arch }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+  manifest:
+    needs: image
+    strategy:
+      matrix:
+        image: [desk, vault-cli]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Combine amd64 and arm64
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/shortdesk-${{ matrix.image }}"
+          VERSION="${GITHUB_REF_NAME#v}"
+          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:latest" \
+            "$IMAGE:$VERSION-amd64" "$IMAGE:$VERSION-arm64"
+
+  release:
+    needs: manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: make web
+      - name: Build binaries
+        run: |
+          REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          LDFLAGS="-s -w -X github.com/shortdesk/shortdesk/internal/cli.Version=$GITHUB_REF_NAME -X github.com/shortdesk/shortdesk/internal/stack.Registry=$REGISTRY"
+          mkdir dist
+          for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+            os=${target%/*}; arch=${target#*/}; name="shortdesk_${os}_${arch}"
+            ext=""; [ "$os" = windows ] && ext=".exe"
+            mkdir -p "build/$name"
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$LDFLAGS" -o "build/$name/shortdesk$ext" ./cmd/shortdesk
+            cp LICENSE README.md "build/$name/"
+            if [ "$os" = windows ]; then
+              (cd "build/$name" && zip -q "../../dist/$name.zip" ./*)
+            else
+              tar -czf "dist/$name.tar.gz" -C "build/$name" .
+            fi
+          done
+          cp scripts/install.sh scripts/install.ps1 dist/
+          (cd dist && sha256sum * > checksums.txt)
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes

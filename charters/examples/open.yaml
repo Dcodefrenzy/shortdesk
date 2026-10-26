@@ -1,7 +1,7 @@
 # A desk that may reach any website. Use for testing and for work that genuinely
 # needs the open web; prefer an allowlist charter (like assistant.yaml) otherwise.
 charter: open
-tenant: ayo
+tenant: personal
 version: 1
 
 desk:
