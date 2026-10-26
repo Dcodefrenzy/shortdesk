@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Makes sure the desk's browser is open (on the desk's screen) and accepting the
+# agent's connection. Exits non-zero if it isn't ready within 30 seconds.
+#
+# Readiness is judged only by the browser's own remote-control port: if Chromium is
+# already open, launching it again just opens a tab in the existing window.
+set -u
+ready() { curl -fs -m 2 http://127.0.0.1:9222/json/version >/dev/null; }
+
+ready && exit 0
+DISPLAY="${DISPLAY:-:0}" setsid desk-chromium about:blank >/tmp/desk-browser.log 2>&1 &
+for _ in $(seq 1 60); do
+  ready && exit 0
+  sleep 0.5
+done
+echo "the desk's browser did not start:" >&2
+tail -5 /tmp/desk-browser.log >&2
+exit 1

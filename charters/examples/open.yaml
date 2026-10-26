@@ -1,0 +1,20 @@
+# A desk that may reach any website. Use for testing and for work that genuinely
+# needs the open web; prefer an allowlist charter (like assistant.yaml) otherwise.
+charter: open
+tenant: ayo
+version: 1
+
+desk:
+  image: shortdesk/desk:dev
+  resources:
+    cpu: "2"
+    memory: 4Gi
+  env:
+    TZ: Europe/London
+
+permissions:
+  network:
+    allow: ["*"]
+
+limits:
+  desk_lifetime: 2h

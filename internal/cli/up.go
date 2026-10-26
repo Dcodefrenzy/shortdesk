@@ -1,0 +1,66 @@
+package cli
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
+
+	"github.com/shortdesk/shortdesk/internal/stack"
+)
+
+func newUpCommand() *cobra.Command {
+	var o serveOptions
+	var rebuild, noOpen bool
+	cmd := &cobra.Command{
+		Use:   "up",
+		Short: "Start Shortdesk: everything it needs, then the dashboard",
+		Long: `Start Shortdesk on this machine. Needs only Docker.
+
+On first run this builds the desk images (several minutes), then it starts OpenSandbox
+(which creates and guards desks), the vault, and the dashboard. Everything is configured
+automatically and kept in ~/.shortdesk. Run it again any time; it picks up where it left off.`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+			out := cmd.OutOrStdout()
+			if _, err := stack.Up(cmd.Context(), stack.Options{
+				Dir:           filepath.Join(home, ".shortdesk"),
+				RebuildImages: rebuild,
+				Log:           func(f string, a ...any) { fmt.Fprintf(out, f+"\n", a...) },
+			}); err != nil {
+				return err
+			}
+			o.onListening = func(url, token string) {
+				fmt.Fprintf(out, "\nOpen %s and log in with this token:\n\n    %s\n\nStop with Ctrl+C (desks keep their files and logins).\n", url, token)
+				if !noOpen {
+					openBrowser(url + "/login/")
+				}
+			}
+			return runServe(cmd, o)
+		},
+	}
+	cmd.Flags().StringVar(&o.addr, "addr", "127.0.0.1:7070", "dashboard address")
+	cmd.Flags().BoolVar(&rebuild, "rebuild-images", false, "rebuild the desk images even if they exist")
+	cmd.Flags().BoolVar(&noOpen, "no-open", false, "don't open the dashboard in the browser")
+	return cmd
+}
+
+func newDownCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "down",
+		Short: "Stop OpenSandbox and the vault (desks, files, logins and chats are kept)",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := stack.Down(cmd.Context()); err != nil {
+				return err
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), "Stopped. Run `shortdesk up` to start again.")
+			return nil
+		},
+	}
+}

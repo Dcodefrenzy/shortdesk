@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Starts the desk: KasmVNC X server (screen + browser viewer on :6080) -> XFCE desktop.
+# Stays in the foreground; if any part dies, the desk exits so the runtime can restart it.
+set -euo pipefail
+
+: "${DESK_RESOLUTION:=1440x900}"
+: "${DESK_VNC_PASSWORD:=}"   # empty = no password (only OK when the port is bound to localhost)
+
+mkdir -p "$HOME/Desktop" "$HOME/.vnc"
+for app in desk-chromium firefox-esr xfce4-terminal thunar; do
+  src="/usr/share/applications/$app.desktop"
+  [ -f "$src" ] && [ ! -f "$HOME/Desktop/$app.desktop" ] && install -m 755 "$src" "$HOME/Desktop/"
+done
+
+if [ -n "$DESK_VNC_PASSWORD" ]; then
+  printf '%s\n%s\n' "$DESK_VNC_PASSWORD" "$DESK_VNC_PASSWORD" | kasmvncpasswd -u desk -w "$HOME/.kasmpasswd" >/dev/null
+  auth=(-KasmPasswordFile "$HOME/.kasmpasswd")
+else
+  auth=(-disableBasicAuth)
+fi
+
+# Plain HTTP on :6080; TLS is terminated in front of the desk (Shortdesk / OpenSandbox proxy).
+# -publicIP skips KasmVNC's STUN lookup, which the desk's egress allowlist blocks (Xvnc exits without it).
+Xvnc :0 \
+  -geometry "$DESK_RESOLUTION" -depth 24 \
+  -websocketPort 6080 -interface 0.0.0.0 -sslOnly 0 \
+  -httpd /usr/share/kasmvnc/www \
+  "${auth[@]}" -SecurityTypes None \
+  -AlwaysShared -FrameRate 30 \
+  -publicIP 127.0.0.1 \
+  -AcceptCutText -SendCutText -SendPrimary \
+  >/tmp/xvnc.log 2>&1 &
+
+until [ -e /tmp/.X11-unix/X0 ]; do sleep 0.2; done
+
+# Mac viewers press Cmd for copy/paste; the viewer sends it as Super. Make Super act as
+# Ctrl so Cmd+C / Cmd+V work (Ctrl keeps working). Set DESK_CMD_AS_CTRL=false to keep Super.
+if [ "${DESK_CMD_AS_CTRL:-true}" = "true" ]; then
+  xmodmap -display :0 -e "clear mod4" -e "add control = Super_L Super_R" || echo "shortdesk: could not map Cmd to Ctrl" >&2
+fi
+
+dbus-launch --exit-with-session startxfce4 >/tmp/xfce.log 2>&1 &
+
+echo "shortdesk: desk ready on :6080"
+wait -n
+echo "shortdesk: a desk process exited, stopping" >&2
+exit 1

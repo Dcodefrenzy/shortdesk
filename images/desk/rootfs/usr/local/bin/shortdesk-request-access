@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Asks the desk's owner to allow a website the desk's charter blocks.
+# The agent cannot change the rules itself: this only prints a request that
+# Shortdesk turns into an approval card in the chat.
+#
+#   shortdesk-request-access <host> "<why it is needed>"
+set -euo pipefail
+if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]; then
+  echo 'usage: shortdesk-request-access <host> "<reason>"' >&2
+  exit 2
+fi
+printf 'SHORTDESK_ACCESS_REQUEST %s\n' "$(jq -cn --arg host "$1" --arg reason "$2" '{host: $host, reason: $reason}')"
+echo "Request sent to the desk's owner. Stop working now and say what you are waiting for; you will be told when access is granted."

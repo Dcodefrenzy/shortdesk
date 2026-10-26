@@ -1,0 +1,12 @@
+{
+  "policies": {
+    "SearchEngines": { "Default": "Google" },
+    "Homepage": { "URL": "https://www.google.com", "StartPage": "homepage" },
+    "DisableAppUpdate": true,
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "OverrideFirstRunPage": "",
+    "OverridePostUpdatePage": "",
+    "DontCheckDefaultBrowser": true
+  }
+}

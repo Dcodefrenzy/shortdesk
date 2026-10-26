@@ -1,0 +1,6 @@
+.env
+*.env
+.DS_Store
+/bin/
+internal/webui/dist/*
+!internal/webui/dist/index.html

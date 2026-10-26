@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Chromium for desks. Every launch path (desktop icon, xdg-open, `claude` login links,
+# the agent) goes through here, so there is one browser with one profile: the person
+# and the agent share its logins, extensions and window.
+#
+# --no-sandbox: containers lack the user namespaces Chromium's own sandbox needs;
+#   the desk container itself is the isolation boundary.
+# --remote-debugging-port: lets the agent's browser tool (Playwright) drive this same
+#   browser instead of starting its own. Bound to 127.0.0.1, so only processes inside
+#   the desk can reach it. Chromium ignores the port for its default profile folder,
+#   so the profile lives in shortdesk-browser.
+profile="$HOME/.config/shortdesk-browser"
+if [ ! -d "$profile" ] && [ -d "$HOME/.config/chromium" ]; then
+  mv "$HOME/.config/chromium" "$profile" # desks saved before the shared browser
+fi
+
+exec /usr/bin/chromium \
+  --no-sandbox --test-type \
+  --password-store=basic \
+  --no-first-run --no-default-browser-check \
+  --disable-dev-shm-usage \
+  --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 \
+  --user-data-dir="$profile" \
+  "$@"

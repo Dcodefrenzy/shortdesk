@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f7f5;
+  --surface: #ffffff;
+  --foreground: #1a1a19;
+  --muted: #6b6b66;
+  --border: #e4e4df;
+  --accent: #2f6f5e;
+  --accent-foreground: #ffffff;
+  --danger: #b4372e;
+  --ok: #2f7d4f;
+  --warn: #a8691a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121211;
+    --surface: #1c1c1a;
+    --foreground: #ececE8;
+    --muted: #9a9a93;
+    --border: #2e2e2b;
+    --accent: #5fb49c;
+    --accent-foreground: #0e1a16;
+    --danger: #e0645a;
+    --ok: #5cbf83;
+    --warn: #e0a24f;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Agent answers rendered from Markdown (components/markdown.tsx). */
+.md > * + * { margin-top: 0.6em; }
+.md h1, .md h2, .md h3 { font-weight: 600; margin-top: 1em; }
+.md h1 { font-size: 1.15em; }
+.md h2 { font-size: 1.05em; }
+.md ul { list-style: disc; padding-left: 1.25em; }
+.md ol { list-style: decimal; padding-left: 1.25em; }
+.md li + li { margin-top: 0.2em; }
+.md a { text-decoration: underline; color: var(--accent); }
+.md code { font-family: var(--font-geist-mono); font-size: 0.9em; background: var(--background); padding: 0.1em 0.3em; border-radius: 4px; }
+.md pre { background: var(--background); padding: 0.75em; border-radius: 6px; overflow-x: auto; }
+.md pre code { background: none; padding: 0; }
+.md table { width: 100%; border-collapse: collapse; font-size: 0.95em; display: block; overflow-x: auto; }
+.md th, .md td { border: 1px solid var(--border); padding: 0.35em 0.6em; text-align: left; }
+.md th { background: var(--background); font-weight: 600; }
+.md blockquote { border-left: 3px solid var(--border); padding-left: 0.75em; color: var(--muted); }

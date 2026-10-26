@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Gives this desk its own working copy of a project in ~/Developer: a git worktree on its
+# own branch (desk/<desk name>). Desks working on the same project never overwrite each
+# other; their branches are merged into the project's main branch from Shortdesk.
+# Everything is local: nothing is pushed anywhere.
+#
+#   desk-project new <name>          create ~/Developer/<name> as a git project, then open it
+#   desk-project open <name>         print this desk's working copy of <name> (created if needed)
+#   desk-project clone <url> [name]  clone a remote project into ~/Developer, then open it
+#   desk-project list                list projects
+#
+# Typical use: cd "$(desk-project open myapp)"
+set -euo pipefail
+
+dev="$HOME/Developer"
+desk=$(cat "$HOME/.shortdesk-desk" 2>/dev/null || hostname)
+desk=$(printf %s "$desk" | tr -c 'A-Za-z0-9-' '-')
+
+git config --global user.name >/dev/null || git config --global user.name "Shortdesk agent ($desk)"
+git config --global user.email >/dev/null || git config --global user.email "agent+$desk@shortdesk.local"
+git config --global init.defaultBranch main
+
+valid() {
+  [[ "$1" =~ ^[A-Za-z0-9._-]+$ && "$1" != .* ]] || { echo "invalid project name: $1" >&2; exit 2; }
+}
+
+open_project() {
+  local repo="$dev/$1" wt="$dev/$1/.desks/$desk"
+  [ -d "$repo/.git" ] || { echo "$repo is not a git project (create it with: desk-project new $1)" >&2; exit 1; }
+  # Keep desks' working copies out of the project itself.
+  grep -qxF '.desks/' "$repo/.git/info/exclude" 2>/dev/null || echo '.desks/' >>"$repo/.git/info/exclude"
+  if [ ! -d "$wt" ]; then
+    git -C "$repo" worktree prune
+    if git -C "$repo" show-ref --verify --quiet "refs/heads/desk/$desk"; then
+      git -C "$repo" worktree add -q "$wt" "desk/$desk"
+    else
+      git -C "$repo" worktree add -q -b "desk/$desk" "$wt" HEAD
+    fi
+  fi
+  echo "$wt"
+}
+
+case "${1:-}" in
+  new)
+    valid "${2:-}"
+    mkdir -p "$dev/$2"
+    if [ ! -d "$dev/$2/.git" ]; then
+      git -C "$dev/$2" init -q
+      git -C "$dev/$2" commit -q --allow-empty -m "Start $2"
+    fi
+    open_project "$2"
+    ;;
+  open)
+    valid "${2:-}"
+    open_project "$2"
+    ;;
+  clone)
+    [ -n "${2:-}" ] || { echo "usage: desk-project clone <url> [name]" >&2; exit 2; }
+    name="${3:-$(basename "$2" .git)}"
+    valid "$name"
+    [ -d "$dev/$name" ] || git clone -q "$2" "$dev/$name"
+    open_project "$name"
+    ;;
+  list)
+    for d in "$dev"/*/; do [ -d "$d.git" ] && basename "$d"; done
+    ;;
+  *)
+    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+    exit 2
+    ;;
+esac

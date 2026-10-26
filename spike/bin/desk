@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Spike helper: move text between your Mac and a desk.
+#
+#   desk paste          Mac clipboard  -> desk clipboard (then Ctrl+V / Ctrl+Shift+V in the desk)
+#   desk copy           desk clipboard -> Mac clipboard  (copy in the desk first, then Cmd+V on the Mac)
+#   desk type           types the Mac clipboard into whatever is focused in the desk
+#                       (for fields that block pasting)
+#   desk shell          opens the desk's terminal here, with normal Mac copy/paste
+#   desk list           shows running desks
+#
+# DESK=<container> picks a desk (default: the newest running desk).
+set -euo pipefail
+
+list_desks() {
+  docker ps --format '{{.Names}}' | grep -E '^(sandbox-[0-9a-f-]{36}|shortdesk-desk|desk-.*)$' || true
+}
+
+DESK="${DESK:-$(list_desks | head -1)}"
+if [ -z "$DESK" ] && [ "${1:-}" != list ]; then
+  echo "No running desk found." >&2; exit 1
+fi
+
+# Our own desk image runs as user "desk" on display :0; the old webtop spike used "abc" on :1.
+if [ -n "$DESK" ] && docker exec "$DESK" id -u desk >/dev/null 2>&1; then
+  DESK_USER=desk DESK_HOME=/home/desk DESK_DISPLAY=:0
+else
+  DESK_USER=abc DESK_HOME=/config DESK_DISPLAY=:1
+fi
+run() { docker exec -i -u "$DESK_USER" -e HOME="$DESK_HOME" -e DISPLAY="$DESK_DISPLAY" "$DESK" "$@"; }
+
+case "${1:-}" in
+  paste)
+    pbpaste | run sh -c 'xclip -selection clipboard -i && xclip -selection clipboard -o | xclip -selection primary -i'
+    echo "Mac clipboard -> $DESK clipboard ($(pbpaste | wc -c | tr -d ' ') chars)"
+    ;;
+  copy)
+    run xclip -selection clipboard -o | pbcopy
+    echo "$DESK clipboard -> Mac clipboard ($(pbpaste | wc -c | tr -d ' ') chars)"
+    ;;
+  type)
+    pbpaste | run sh -c 'xdotool type --delay 40 --file -'
+    echo "Typed Mac clipboard into the focused window in $DESK"
+    ;;
+  shell)
+    docker exec -it -u "$DESK_USER" -e HOME="$DESK_HOME" -e DISPLAY="$DESK_DISPLAY" -w "$DESK_HOME" "$DESK" bash
+    ;;
+  list)
+    list_desks
+    ;;
+  *)
+    sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+    exit 1
+    ;;
+esac

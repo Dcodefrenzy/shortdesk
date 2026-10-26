@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Starts Free Claude Code for the agent, with the router settings Shortdesk passes in the
+# environment (MODEL, MODEL_FALLBACKS, provider *_API_KEY values). It listens only inside
+# the desk. If the settings changed since it started, it is restarted with the new ones.
+set -u
+export HOST=127.0.0.1 PORT=8082 FCC_OPEN_BROWSER=false
+
+ready() { curl -fs -m 2 http://127.0.0.1:8082/health >/dev/null; }
+config=/tmp/shortdesk-fcc.config
+want=$(env | grep -E '^(MODEL|MODEL_[A-Z_]+|[A-Z_]+_API_KEY)=' | grep -v '^ANTHROPIC_' | sort | sha256sum | cut -c1-16)
+
+if ready && [ "$(cat "$config" 2>/dev/null)" = "$want" ]; then
+  exit 0
+fi
+pkill -f 'fcc-server' 2>/dev/null && sleep 1
+setsid fcc-server --auto-started >/tmp/fcc.log 2>&1 &
+echo "$want" >"$config"
+for _ in $(seq 1 120); do
+  ready && exit 0
+  sleep 0.5
+done
+echo "Free Claude Code did not start:" >&2
+tail -20 /tmp/fcc.log >&2
+exit 1

@@ -1,0 +1,45 @@
+# A personal assistant desk that can only reach Claude and example.com.
+# Every field Shortdesk does not support yet is rejected, so this file is the
+# full list of what a charter can say today.
+charter: assistant
+tenant: ayo
+version: 1
+
+desk:
+  image: shortdesk/desk:dev
+  resources:
+    cpu: "2"
+    memory: 4Gi
+  env:
+    TZ: Europe/London
+
+permissions:
+  network:
+    allow:
+      - example.com
+      - claude.ai
+      - "*.claude.ai"
+      - claude.com
+      - "*.claude.com"
+      - anthropic.com
+      - "*.anthropic.com"
+      # Human-verification checks: Cloudflare Turnstile, hCaptcha (used by claude.ai's
+      # login) and Google reCAPTCHA (served from www.google.com/recaptcha and recaptcha.net).
+      - challenges.cloudflare.com
+      - hcaptcha.com
+      - "*.hcaptcha.com"
+      - recaptcha.net
+      - "*.recaptcha.net"
+      # Certificate revocation checks browsers make on every HTTPS site.
+      - "*.lencr.org"
+      - "*.pki.goog"
+      - "*.digicert.com"
+      # Google: search (the desk's default search engine), reCAPTCHA and "Sign in with Google".
+      - google.com
+      - "*.google.com"
+      - "*.gstatic.com"
+      - "*.googleapis.com"
+      - "*.googleusercontent.com"
+
+limits:
+  desk_lifetime: 2h

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Shows what the desk's agent is doing, live, in a terminal window on the desk.
+# Reads the agent's stream-json log written by Shortdesk's runner. Read-only.
+set -uo pipefail
+
+log=/tmp/shortdesk-agent.jsonl
+touch "$log"
+printf '\e]0;Shortdesk agent\a'
+printf '\e[1mShortdesk agent\e[0m — live activity on this desk (read-only)\n'
+
+# Inside "catch", jq's "." is the error message, so keep the raw line in $line.
+tail -n +1 -F "$log" 2>/dev/null | jq --unbuffered -rR '
+  select(length > 0)
+  | . as $line
+  | (try fromjson catch {type: "raw", text: $line}) as $e
+  | if $e.type == "raw" then $e.text
+    elif $e.type == "system" and $e.subtype == "init" then "● Agent started (\($e.model // "unknown model"))"
+    elif $e.type == "assistant" then
+      ($e.message.content[]?
+        | if .type == "text" then "\n" + .text
+          elif .type == "tool_use" then
+            "  ▸ \(.name)  " + ((.input.url // .input.command // .input.query // .input.file_path // (.input | tostring)) | tostring | .[0:160])
+          else empty end)
+    elif $e.type == "result" then
+      (if $e.is_error then "\n✕ " else "\n✓ " end) + (($e.result // "done") | tostring)
+    else empty end'
