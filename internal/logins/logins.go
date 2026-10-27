@@ -148,7 +148,7 @@ func (m *Manager) Desk(ctx context.Context, deskID string) ([]DeskLogin, error) 
 	m.mu.Lock()
 	revoked := m.idx.Revoked[deskID]
 	m.mu.Unlock()
-	var out []DeskLogin
+	out := []DeskLogin{}
 	for _, l := range m.Saved() {
 		st := StatusMissing
 		switch {

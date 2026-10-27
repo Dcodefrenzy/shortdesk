@@ -160,7 +160,7 @@ func (m *Manager) Rules(d desk.Desk) (Rules, error) {
 		return Rules{}, err
 	}
 	_, canSet := m.desks.Runtime().(runtime.NetworkPolicy)
-	r := Rules{Unrestricted: c.Permissions.Network.Unrestricted()}
+	r := Rules{Unrestricted: c.Permissions.Network.Unrestricted(), Hosts: []Rule{}}
 	r.Editable = canSet && !r.Unrestricted
 	if r.Unrestricted {
 		return r, nil

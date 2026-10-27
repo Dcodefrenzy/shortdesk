@@ -453,3 +453,20 @@ func TestLoginLinkWorksOnce(t *testing.T) {
 		t.Error("expired code accepted")
 	}
 }
+
+// A fresh install has no saved logins; the dashboard needs empty lists, not null.
+func TestSettingsListsAreNeverNull(t *testing.T) {
+	env := newTestEnv(t)
+	d := decode[deskJSON](t, env.do(t, "POST", "/api/desks", `{"charter":"assistant"}`, true))
+	st := decode[map[string]json.RawMessage](t, env.do(t, "GET", "/api/desks/"+d.ID+"/settings", "", true))
+	var network map[string]json.RawMessage
+	json.Unmarshal(st["network"], &network)
+	for name, raw := range map[string]json.RawMessage{
+		"apps": st["apps"], "shared": st["shared"], "logins": st["logins"],
+		"integrations": st["integrations"], "network.hosts": network["hosts"],
+	} {
+		if !strings.HasPrefix(string(raw), "[") {
+			t.Errorf("%s = %s, want a list", name, raw)
+		}
+	}
+}

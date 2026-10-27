@@ -43,7 +43,11 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
     );
   }
 
-  const { network } = s;
+  const network = { ...s.network, hosts: s.network.hosts ?? [] };
+  const logins = s.logins ?? [];
+  const shared = s.shared ?? [];
+  const apps = s.apps ?? [];
+  const integrations = s.integrations ?? [];
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
@@ -53,13 +57,13 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
           title="Logins"
           hint="Saved automatically when you (or the agent) log in on any desk, and given to every desk. Revoke one to log this desk out of it."
         >
-          {s.logins.length === 0 ? (
+          {logins.length === 0 ? (
             <p className="text-sm text-muted">
               No logins yet. Log into a website or app on any desk; it shows up here within a minute.
             </p>
           ) : (
             <ul className="divide-y divide-border rounded-md border border-border">
-              {s.logins.map((l) => (
+              {logins.map((l) => (
                 <li key={`${l.kind}/${l.name}`} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
                   <span className="min-w-0 flex-1">
                     <span className="font-medium">{loginLabel(l)}</span>
@@ -87,11 +91,11 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
           title="Shared folders"
           hint="The same files on every desk, kept in Shortdesk's own storage. New desks start with all of them."
         >
-          {s.shared.length === 0 ? (
+          {shared.length === 0 ? (
             <p className="text-sm text-muted">No shared folders.</p>
           ) : (
             <ul className="space-y-1 text-sm">
-              {s.shared.map((f) => (
+              {shared.map((f) => (
                 <li key={f.path} className="font-mono">
                   {f.path.replace("/home/desk", "~")}
                 </li>
@@ -191,7 +195,7 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
 
         <Section title="Apps" hint="What's installed on this desk. Adding apps comes with the app catalog.">
           <ul className="grid gap-2 sm:grid-cols-2">
-            {s.apps.map((a) => (
+            {apps.map((a) => (
               <li
                 key={a.name}
                 className={`rounded-md border border-border px-3 py-2 text-sm ${a.installed ? "" : "opacity-60"}`}
@@ -209,10 +213,10 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
         </Section>
 
         <Section title="Integrations" hint="Accounts and connections (Slack, Bitbucket, Instagram…).">
-          {s.integrations.length === 0 ? (
+          {integrations.length === 0 ? (
             <p className="text-sm text-muted">None connected yet. Integrations arrive with the app catalog and vault.</p>
           ) : (
-            <ul className="text-sm">{s.integrations.map((i) => <li key={i}>{i}</li>)}</ul>
+            <ul className="text-sm">{integrations.map((i) => <li key={i}>{i}</li>)}</ul>
           )}
         </Section>
       </div>
