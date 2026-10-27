@@ -100,6 +100,16 @@ func (s *Store) Begin(deskID, prompt string) (t Task, first bool, ok bool) {
 	return *task, first, true
 }
 
+// TaskCount returns how many tasks the desk has had.
+func (s *Store) TaskCount(deskID string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if l, ok := s.desks[deskID]; ok {
+		return len(l.tasks)
+	}
+	return 0
+}
+
 // Active returns the desk's running or paused task.
 func (s *Store) Active(deskID string) (Task, bool) {
 	s.mu.Lock()

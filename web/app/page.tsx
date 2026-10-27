@@ -40,7 +40,7 @@ function Workspace() {
           <div className="w-full max-w-md space-y-4">
             {loadError && <ErrorNote message={loadError} />}
             {selectedId && desks && !desk && <ErrorNote message="That desk no longer exists." />}
-            <FirstStartHint />
+            <FirstStartHint desks={desks} />
             <StartDesk onStarted={reload} />
           </div>
         </main>

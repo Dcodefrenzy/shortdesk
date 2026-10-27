@@ -12,6 +12,7 @@ export type Desk = {
   expiresAt?: string;
   agent: AgentState;
   viewerUrl: string;
+  tasks: number;
 };
 
 export type Charter = {

@@ -150,12 +150,15 @@ type deskJSON struct {
 	Agent agent.State `json:"agent"`
 	// ViewerURL is relative to this server: the desk's screen, through the proxy.
 	ViewerURL string `json:"viewerUrl"`
+	// Tasks is how many tasks the desk has been given.
+	Tasks int `json:"tasks"`
 }
 
 func (s *Server) toJSON(d desk.Desk) deskJSON {
 	j := deskJSON{
 		ID: d.ID, Name: d.Name, Charter: d.Charter, Tenant: d.Tenant, State: d.State,
 		CreatedAt: d.CreatedAt, ViewerURL: viewerPath(d.ID), Agent: s.agent.Store().State(d.ID),
+		Tasks: s.agent.Store().TaskCount(d.ID),
 	}
 	if !d.ExpiresAt.IsZero() {
 		j.ExpiresAt = &d.ExpiresAt
