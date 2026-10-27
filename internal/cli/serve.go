@@ -116,6 +116,9 @@ func runServe(cmd *cobra.Command, o serveOptions) error {
 	if err != nil {
 		return fmt.Errorf("can't listen on %s (is Shortdesk already running?): %w", o.addr, err)
 	}
+	if w := exposureWarning(ln.Addr(), o.secure); w != "" {
+		fmt.Fprintln(cmd.ErrOrStderr(), w)
+	}
 	srv := &http.Server{Handler: app.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	url := "http://" + strings.Replace(o.addr, "127.0.0.1", "localhost", 1)
 	fmt.Fprintf(cmd.OutOrStdout(), "Shortdesk is running: %s (runtime %s)\n", url, m.Runtime().Name())
@@ -135,6 +138,21 @@ func runServe(cmd *cobra.Command, o serveOptions) error {
 		defer cancel()
 		return srv.Shutdown(ctx)
 	}
+}
+
+// exposureWarning explains the risk when the dashboard listens beyond this machine.
+func exposureWarning(addr net.Addr, secure bool) string {
+	tcp, ok := addr.(*net.TCPAddr)
+	if !ok || tcp.IP.IsLoopback() {
+		return ""
+	}
+	msg := "Warning: the dashboard is reachable from other machines at " + addr.String() + ". Anyone who can reach it\n" +
+		"and has the admin token controls your desks, logins and keys."
+	if !secure {
+		msg += " It uses plain HTTP, so the token can be read on the network:\n" +
+			"put it behind HTTPS (and pass --secure-cookies), or use the default 127.0.0.1."
+	}
+	return msg
 }
 
 // seedCharters gives a new installation the example charters.
