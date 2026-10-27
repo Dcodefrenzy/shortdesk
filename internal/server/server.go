@@ -123,6 +123,7 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("GET /api/workspace", s.getWorkspace)
 	authed.HandleFunc("PUT /api/workspace/connections/{name}", s.setConnection)
 	authed.HandleFunc("PUT /api/workspace/router", s.setRouter)
+	authed.HandleFunc("PUT /api/workspace/main-desk", s.setMainDesk)
 	authed.Handle("/desks/{id}/view/{rest...}", s.viewer)
 
 	protected := s.requireAuth(authed)

@@ -15,7 +15,12 @@ const sourceLabel: Record<NetworkRule["source"], string> = {
   models: "for your models",
 };
 
-export function SettingsPanel({ deskId }: { deskId: string }) {
+export type SettingsSection = "logins" | "shared" | "desk" | "websites" | "apps" | "integrations";
+
+// A desk's settings. With sections, only those are shown, without the page frame (the
+// phone's Settings app shows a few of them).
+export function SettingsPanel({ deskId, sections }: { deskId: string; sections?: SettingsSection[] }) {
+  const show = (x: SettingsSection) => !sections || sections.includes(x);
   const load = useCallback(() => api.settings(deskId), [deskId]);
   const { data: s, error, reload } = usePoll(load, REFRESH_MS);
   const [host, setHost] = useState("");
@@ -49,11 +54,11 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
   const apps = s.apps ?? [];
   const integrations = s.integrations ?? [];
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+    <div className={sections ? "" : "h-full overflow-y-auto"}>
+      <div className={sections ? "space-y-3" : "mx-auto max-w-3xl space-y-6 px-4 py-6"}>
         {actionError && <ErrorNote message={actionError} />}
 
-        <Section
+        {show("logins") && <Section
           title="Logins"
           hint="Saved automatically when you (or the agent) log in on any desk, and given to every desk. Revoke one to log this desk out of it."
         >
@@ -85,9 +90,9 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
               ))}
             </ul>
           )}
-        </Section>
+        </Section>}
 
-        <Section
+        {show("shared") && <Section
           title="Shared folders"
           hint="The same files on every desk, kept in Shortdesk's own storage. New desks start with all of them."
         >
@@ -103,9 +108,9 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
             </ul>
           )}
           <p className="mt-2 text-xs text-muted">Desks created before shared folders existed don&apos;t have them.</p>
-        </Section>
+        </Section>}
 
-        <Section title="Desk">
+        {show("desk") && <Section title="Desk">
           <Grid
             rows={[
               ["Charter", s.charter ? `${s.charter.name}${s.charter.version ? ` (v${s.charter.version})` : ""}` : s.desk.charter],
@@ -116,9 +121,9 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
               ["State", s.desk.state],
             ]}
           />
-        </Section>
+        </Section>}
 
-        <Section
+        {show("websites") && <Section
           title="Websites"
           hint="The desk can only reach these. The agent can ask for more; you approve in the chat."
         >
@@ -166,7 +171,7 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
               </ul>
               {network.editable ? (
                 <form
-                  className="mt-3 flex gap-2"
+                  className="mt-3 flex flex-wrap gap-2"
                   onSubmit={(e) => {
                     e.preventDefault();
                     const h = host.trim();
@@ -177,7 +182,7 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
                     value={host}
                     onChange={(e) => setHost(e.target.value)}
                     placeholder="booking.com or *.booking.com"
-                    className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:border-accent"
+                    className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:border-accent"
                   />
                   <Button type="submit" variant="primary" disabled={busy || !host.trim()}>
                     {busy ? <Spinner /> : "Allow on this desk"}
@@ -191,10 +196,10 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
               </p>
             </>
           )}
-        </Section>
+        </Section>}
 
-        <Section title="Apps" hint="What's installed on this desk. Adding apps comes with the app catalog.">
-          <ul className="grid gap-2 sm:grid-cols-2">
+        {show("apps") && <Section title="Desk software" hint="What's installed on the desk. More comes with the Store.">
+          <ul className="grid gap-2">
             {apps.map((a) => (
               <li
                 key={a.name}
@@ -210,15 +215,15 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
               </li>
             ))}
           </ul>
-        </Section>
+        </Section>}
 
-        <Section title="Integrations" hint="Accounts and connections (Slack, Bitbucket, Instagram…).">
+        {show("integrations") && <Section title="Integrations" hint="Accounts and connections (Slack, Bitbucket, Instagram…).">
           {integrations.length === 0 ? (
             <p className="text-sm text-muted">None connected yet. Integrations arrive with the app catalog and vault.</p>
           ) : (
             <ul className="text-sm">{integrations.map((i) => <li key={i}>{i}</li>)}</ul>
           )}
-        </Section>
+        </Section>}
       </div>
     </div>
   );

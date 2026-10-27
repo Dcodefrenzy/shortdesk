@@ -57,8 +57,9 @@
   --color-danger: var(--danger);
   --color-ok: var(--ok);
   --color-warn: var(--warn);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans-face), "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, Menlo, monospace;
+  --font-display: var(--font-display-face), "Avenir Next", system-ui, sans-serif;
 }
 
 body {
@@ -75,7 +76,7 @@ body {
 .md ol { list-style: decimal; padding-left: 1.25em; }
 .md li + li { margin-top: 0.2em; }
 .md a { text-decoration: underline; color: var(--accent); }
-.md code { font-family: var(--font-geist-mono); font-size: 0.9em; background: var(--background); padding: 0.1em 0.3em; border-radius: 4px; }
+.md code { font-family: var(--font-mono); font-size: 0.9em; background: var(--background); padding: 0.1em 0.3em; border-radius: 4px; }
 .md pre { background: var(--background); padding: 0.75em; border-radius: 6px; overflow-x: auto; }
 .md pre code { background: none; padding: 0; }
 .md table { width: 100%; border-collapse: collapse; font-size: 0.95em; display: block; overflow-x: auto; }

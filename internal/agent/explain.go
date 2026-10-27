@@ -18,22 +18,22 @@ func explainFailure(problems string, limited, hadBackup bool) string {
 	switch {
 	case notSignedInRe.MatchString(problems):
 		return "Claude isn't signed in. Open this desk's **Desktop** tab, run `claude` in the terminal and sign in once; " +
-			"every desk gets the login. Or add a Claude token in [Workspace settings](/workspace/)."
+			"every desk gets the login. Or add a Claude token in [Settings](/?app=settings)."
 	case noCreditRe.MatchString(problems):
 		return "Your account with this AI provider is out of credit. Top it up on the provider's website, " +
-			"or add a different model key in [Workspace settings](/workspace/)."
+			"or add a different model key in [Settings](/?app=settings)."
 	case badKeyRe.MatchString(problems):
-		return "An AI key was rejected. Check it and paste it again in [Workspace settings](/workspace/) → AI connections."
+		return "An AI key was rejected. Check it and paste it again in [Settings](/?app=settings) → AI connections."
 	case unreachableRe.MatchString(problems):
 		return "The desk couldn't reach the AI service. Check this computer's internet connection. If the desk uses a " +
 			"website list, make sure the service is allowed: this desk's **Settings → Websites**, or turn on **Allow all websites**."
 	case limited && !hadBackup:
 		return "Claude's usage limit is reached and there's no backup model. Add a model key in " +
-			"[Workspace settings](/workspace/) (Gemini and Groq have free tiers) and tasks switch to it automatically, " +
+			"[Settings](/?app=settings) (Gemini and Groq have free tiers) and tasks switch to it automatically, " +
 			"or try again after the limit resets."
 	case limited:
 		return "All your models are out of usage right now. Try again after a limit resets, or add another model key in " +
-			"[Workspace settings](/workspace/)."
+			"[Settings](/?app=settings)."
 	}
 	return ""
 }

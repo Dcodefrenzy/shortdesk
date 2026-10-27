@@ -64,6 +64,8 @@ export type Workspace = {
   router: { mode: RouterMode; models: string[] };
   // The order actually used after Claude: the router's list, or one default per key set.
   ownModels: string[];
+  // The desk you chat with ("" when there are no desks).
+  mainDesk: string;
 };
 
 // A code project in ~/Developer, and this desk's work on it (its own git branch).
@@ -167,6 +169,8 @@ export const api = {
   deleteIntegration: (id: string) => request<void>(`/api/integrations/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
   workspace: () => request<Workspace>("/api/workspace"),
+  setMainDesk: (id: string) =>
+    request<void>("/api/workspace/main-desk", { method: "PUT", body: JSON.stringify({ id }) }),
   setRouter: (router: Workspace["router"]) =>
     request<void>("/api/workspace/router", { method: "PUT", body: JSON.stringify(router) }),
   setConnection: (name: string, value: string) =>

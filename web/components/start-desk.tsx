@@ -1,8 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { api, type Desk } from "@/lib/api";
 import { useAuthRedirect } from "@/lib/use-auth-redirect";
 import { usePoll } from "@/lib/use-poll";
 import { Button, Card, ErrorNote, Spinner } from "./ui";
@@ -10,8 +9,7 @@ import { Button, Card, ErrorNote, Spinner } from "./ui";
 // Charters are re-read every minute so files added on the server show up.
 const CHARTERS_REFRESH_MS = 60000;
 
-export function StartDesk({ onStarted }: { onStarted: () => void }) {
-  const router = useRouter();
+export function StartDesk({ title = "Start a desk", onStarted }: { title?: string; onStarted: (d: Desk) => void }) {
   const { data: charters, error: loadErr } = usePoll(api.charters, CHARTERS_REFRESH_MS);
   const loadError = useAuthRedirect(loadErr);
   const [picked, setPicked] = useState("");
@@ -28,8 +26,8 @@ export function StartDesk({ onStarted }: { onStarted: () => void }) {
     setError("");
     try {
       const d = await api.startDesk(selected, name.trim() || undefined);
-      onStarted();
-      router.push(`/?desk=${encodeURIComponent(d.id)}`);
+      setStarting(false);
+      onStarted(d);
     } catch (err) {
       setError((err as Error).message);
       setStarting(false);
@@ -40,7 +38,7 @@ export function StartDesk({ onStarted }: { onStarted: () => void }) {
 
   return (
     <Card className="p-4">
-      <h2 className="font-semibold">Start a desk</h2>
+      <h2 className="font-semibold">{title}</h2>
       <p className="mt-1 text-sm text-muted">Pick a charter. It decides what the desk can reach and how long it lives.</p>
 
       {charters === undefined && !loadError && <p className="mt-4 text-sm text-muted">Loading charters…</p>}

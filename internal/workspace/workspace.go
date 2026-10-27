@@ -74,6 +74,8 @@ var otherSecrets = []string{"vault_email", "vault_master_password"}
 type file struct {
 	Secrets map[string]string `json:"secrets"`
 	Router  Router            `json:"router"`
+	// MainDesk is the ID of the desk the owner chats with.
+	MainDesk string `json:"mainDesk,omitempty"`
 }
 
 // Store persists workspace settings in one JSON file.
@@ -197,6 +199,21 @@ func (s *Store) Router() Router {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.data.Router
+}
+
+// MainDesk returns the ID of the desk the owner chats with ("" when none was picked).
+func (s *Store) MainDesk() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.data.MainDesk
+}
+
+// SetMainDesk records which desk the owner chats with.
+func (s *Store) SetMainDesk(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data.MainDesk = id
+	return s.saveLocked()
 }
 
 // SetRouter replaces the routing configuration.

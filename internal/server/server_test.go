@@ -470,3 +470,32 @@ func TestSettingsListsAreNeverNull(t *testing.T) {
 		}
 	}
 }
+
+func TestMainDesk(t *testing.T) {
+	env := newTestEnv(t)
+	main := func() string {
+		return decode[workspaceJSON](t, env.do(t, "GET", "/api/workspace", "", true)).MainDesk
+	}
+	if got := main(); got != "" {
+		t.Fatalf("main desk with no desks = %q", got)
+	}
+	a := decode[deskJSON](t, env.do(t, "POST", "/api/desks", `{"charter":"assistant","name":"first"}`, true))
+	time.Sleep(10 * time.Millisecond)
+	b := decode[deskJSON](t, env.do(t, "POST", "/api/desks", `{"charter":"assistant","name":"second"}`, true))
+	if got := main(); got != a.ID {
+		t.Errorf("default main desk = %q, want the oldest %q", got, a.ID)
+	}
+	if resp := env.do(t, "PUT", "/api/workspace/main-desk", `{"id":"`+b.ID+`"}`, true); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("pick main desk = %d", resp.StatusCode)
+	}
+	if got := main(); got != b.ID {
+		t.Errorf("picked main desk = %q, want %q", got, b.ID)
+	}
+	if resp := env.do(t, "PUT", "/api/workspace/main-desk", `{"id":"nope"}`, true); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("unknown desk = %d, want 404", resp.StatusCode)
+	}
+	env.do(t, "DELETE", "/api/desks/"+b.ID, "", true)
+	if got := main(); got != a.ID {
+		t.Errorf("after removing the main desk = %q, want %q", got, a.ID)
+	}
+}
