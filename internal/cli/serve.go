@@ -35,7 +35,7 @@ const loginCaptureEvery = time.Minute
 type serveOptions struct {
 	addr, chartersDir, webDir, workspacePath string
 	secure                                   bool
-	onListening                              func(url, token string) // called once the server accepts connections
+	onListening                              func(url, token, loginLink string) // called once the server accepts connections
 }
 
 func newServeCommand() *cobra.Command {
@@ -122,7 +122,7 @@ func runServe(cmd *cobra.Command, o serveOptions) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "Admin token %s\n", source)
 	fmt.Fprintf(cmd.OutOrStdout(), "Charters: %s\n", o.chartersDir)
 	if o.onListening != nil {
-		o.onListening(url, token)
+		o.onListening(url, token, url+app.LoginLink())
 	}
 
 	errc := make(chan error, 1)

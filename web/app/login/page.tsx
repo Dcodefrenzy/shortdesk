@@ -1,16 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Logo } from "@/components/logo";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { api } from "@/lib/api";
+
+const noSubscribe = () => () => {};
 
 export default function LoginPage() {
   const router = useRouter();
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const expired = useSyncExternalStore(
+    noSubscribe,
+    () => new URLSearchParams(window.location.search).get("link") === "expired",
+    () => false,
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,8 +38,14 @@ export default function LoginPage() {
         <h1 className="text-lg">
           <Logo size={28} />
         </h1>
-        <p className="mt-1 text-sm text-muted">
-          Enter the admin token. <code className="font-mono text-xs">shortdesk serve</code> prints where it is kept.
+        {expired && (
+          <p className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-sm">
+            That login link was already used or has expired. Log in with the token instead.
+          </p>
+        )}
+        <p className="mt-3 text-sm text-muted">
+          Paste the admin token. <code className="font-mono text-xs">shortdesk up</code> prints it in the terminal, and
+          it&apos;s saved in <code className="font-mono text-xs">~/.shortdesk/admin-token</code>.
         </p>
         <form onSubmit={submit} className="mt-5 space-y-3">
           <input

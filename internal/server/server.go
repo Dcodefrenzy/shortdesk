@@ -52,6 +52,7 @@ type Server struct {
 	projects  *projects.Manager
 	vault     *vault.Vault
 	viewer    *viewerProxy
+	codes     loginCodes
 	log       *slog.Logger
 }
 
@@ -84,6 +85,7 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "runtime": s.desks.Runtime().Name()})
 	})
 	mux.HandleFunc("POST /api/login", s.login)
+	mux.HandleFunc("GET /login/link", s.loginWithLink)
 	mux.HandleFunc("POST /api/logout", s.logout)
 
 	authed := http.NewServeMux()

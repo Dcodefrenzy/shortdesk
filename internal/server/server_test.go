@@ -26,6 +26,7 @@ import (
 const token = "test-token"
 
 type testEnv struct {
+	server *Server
 	srv    *httptest.Server
 	rt     *runtimetest.FakeWithPolicy
 	screen *httptest.Server // stands in for every desk's screen
@@ -64,6 +65,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	}
 	s := New(Config{Token: token, ChartersDir: dir, ReadyTimeout: 5 * time.Second},
 		desk.NewManager(env.rt), runner, ws, lg, vault.New(filepath.Join(dir, "vault"), ws), log)
+	env.server = s
 	env.srv = httptest.NewServer(s.Handler())
 	t.Cleanup(env.srv.Close)
 	return env
@@ -410,5 +412,44 @@ func TestOutputsAreServedSandboxed(t *testing.T) {
 	}
 	if resp := env.do(t, "GET", "/api/desks/"+d.ID+"/outputs/..%2Fsecret", "", true); resp.StatusCode == 200 {
 		t.Error("path outside outputs served")
+	}
+}
+
+func TestLoginLinkWorksOnce(t *testing.T) {
+	env := newTestEnv(t)
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	visit := func(path string) *http.Response {
+		t.Helper()
+		resp, err := noRedirect.Get(env.srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp
+	}
+
+	link := env.server.LoginLink()
+	resp := visit(link)
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/" || len(resp.Cookies()) != 1 {
+		t.Fatalf("first use: %d %s cookies=%d", resp.StatusCode, resp.Header.Get("Location"), len(resp.Cookies()))
+	}
+	session := resp.Cookies()[0]
+	req, _ := http.NewRequest("GET", env.srv.URL+"/api/session", nil)
+	req.AddCookie(session)
+	if r, _ := http.DefaultClient.Do(req); r.StatusCode != http.StatusOK {
+		t.Errorf("session from link not accepted: %d", r.StatusCode)
+	}
+
+	for _, path := range []string{link, "/login/link?code=nope", "/login/link"} {
+		if resp := visit(path); resp.Header.Get("Location") != "/login/?link=expired" || len(resp.Cookies()) != 0 {
+			t.Errorf("%s: %s cookies=%d", path, resp.Header.Get("Location"), len(resp.Cookies()))
+		}
+	}
+
+	var c loginCodes
+	code := c.issue()
+	c.codes[code] = time.Now().Add(-time.Second)
+	if c.redeem(code) {
+		t.Error("expired code accepted")
 	}
 }

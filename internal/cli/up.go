@@ -36,11 +36,16 @@ automatically and kept in ~/.shortdesk. Run it again any time; it picks up where
 			}); err != nil {
 				return err
 			}
-			o.onListening = func(url, token string) {
-				fmt.Fprintf(out, "\nOpen %s and log in with this token:\n\n    %s\n\nStop with Ctrl+C (desks keep their files and logins).\n", url, token)
-				if !noOpen {
-					openBrowser(url + "/login/")
+			o.onListening = func(url, token, loginLink string) {
+				if noOpen {
+					fmt.Fprintf(out, "\nOpen %s and log in with this token:\n\n    %s\n", url, token)
+				} else {
+					fmt.Fprintf(out, "\nOpening %s in your browser (already logged in).\nOn another browser, log in with this token:\n\n    %s\n", url, token)
+					if err := openBrowser(loginLink); err != nil {
+						fmt.Fprintf(out, "Couldn't open the browser (%v); open %s yourself.\n", err, url)
+					}
 				}
+				fmt.Fprintln(out, "\nStop with Ctrl+C (desks keep their files and logins).")
 			}
 			return runServe(cmd, o)
 		},
