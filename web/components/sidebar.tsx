@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, type Desk } from "@/lib/api";
 import { Logo } from "./logo";
+import { ThemeSwitch } from "./theme-switch";
 import { AgentDot, Button } from "./ui";
 
 export function Sidebar({ desks, selectedId }: { desks: Desk[] | undefined; selectedId: string }) {
@@ -68,6 +69,9 @@ export function Sidebar({ desks, selectedId }: { desks: Desk[] | undefined; sele
         <Button variant="ghost" className="w-full justify-start" onClick={logout}>
           Log out
         </Button>
+        <div className="px-1 pt-1.5">
+          <ThemeSwitch />
+        </div>
       </div>
     </nav>
   );

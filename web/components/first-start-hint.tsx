@@ -65,7 +65,7 @@ function Step({ n, done, title, children }: { n: number; done: boolean; title: s
       <span
         aria-hidden
         className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
-          done ? "bg-ok text-white" : "border border-border text-muted"
+          done ? "bg-ok text-background" : "border border-border text-muted"
         }`}
       >
         {done ? "✓" : n}

@@ -1,31 +1,49 @@
 @import "tailwindcss";
 
+/* Colours. Light is the default; dark follows the computer's setting unless the
+   owner picks one in the sidebar (data-theme on <html>, see lib/theme.ts). */
 :root {
-  --background: #f7f7f5;
+  color-scheme: light;
+  --background: #f5f6f7;
   --surface: #ffffff;
-  --foreground: #1a1a19;
-  --muted: #6b6b66;
-  --border: #e4e4df;
-  --accent: #2f6f5e;
+  --foreground: #15181b;
+  --muted: #62686f;
+  --border: #e2e5e8;
+  --accent: #1d7a63;
   --accent-foreground: #ffffff;
-  --danger: #b4372e;
-  --ok: #2f7d4f;
-  --warn: #a8691a;
+  --danger: #c2372d;
+  --ok: #23824f;
+  --warn: #a8640f;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #121211;
-    --surface: #1c1c1a;
-    --foreground: #ececE8;
-    --muted: #9a9a93;
-    --border: #2e2e2b;
-    --accent: #5fb49c;
-    --accent-foreground: #0e1a16;
-    --danger: #e0645a;
-    --ok: #5cbf83;
-    --warn: #e0a24f;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: #0e1113;
+    --surface: #171b1e;
+    --foreground: #e7eaec;
+    --muted: #949ba2;
+    --border: #272c30;
+    --accent: #4cc3a2;
+    --accent-foreground: #08201a;
+    --danger: #f06a5f;
+    --ok: #55c98a;
+    --warn: #eba650;
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0e1113;
+  --surface: #171b1e;
+  --foreground: #e7eaec;
+  --muted: #949ba2;
+  --border: #272c30;
+  --accent: #4cc3a2;
+  --accent-foreground: #08201a;
+  --danger: #f06a5f;
+  --ok: #55c98a;
+  --warn: #eba650;
 }
 
 @theme inline {

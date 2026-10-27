@@ -55,7 +55,7 @@ export function DesktopPanel({ desk, agent, visible }: Props) {
       )}
 
       {error && (
-        <p className="absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-danger px-3 py-1.5 text-sm text-white">
+        <p className="absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-danger px-3 py-1.5 text-sm text-background">
           {error}
         </p>
       )}
