@@ -22,6 +22,7 @@ const (
 	KindError      Kind = "error"
 	KindStatus     Kind = "status" // the task's status changed
 	KindLog        Kind = "log"    // other output
+	KindHelp       Kind = "help"   // after a failure: what the person can do about it
 
 	// KindAccessRequest is the agent asking to reach a blocked website.
 	// Data: requestId, host, reason.

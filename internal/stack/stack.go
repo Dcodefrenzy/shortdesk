@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -53,6 +54,11 @@ func Up(ctx context.Context, o Options) (Stack, error) {
 		return Stack{}, errors.New("Docker isn't running. Install Docker (Docker Desktop on Mac/Windows) and start it, then run shortdesk up again")
 	}
 	desktop := strings.Contains(osName, "Docker Desktop")
+	if out, err := docker(ctx, "info", "--format", "{{.MemTotal}} {{.NCPU}} {{.Name}}"); err == nil {
+		if warning := resourceWarning(out); warning != "" {
+			o.Log("%s", warning)
+		}
+	}
 
 	if err := ensureImages(ctx, o.Version, o.RebuildImages, o.Log); err != nil {
 		return Stack{}, err
@@ -107,6 +113,28 @@ func Up(ctx context.Context, o Options) (Stack, error) {
 func Down(ctx context.Context) error {
 	_, err := docker(ctx, "rm", "-f", openSandboxName, "shortdesk-vault", "shortdesk-vault-cli")
 	return err
+}
+
+// minDockerMemory is what one desk needs with room to spare (a desk asks for 4 GB).
+const minDockerMemory = 6 << 30
+
+// resourceWarning explains how to give Docker more memory when it has too little for a
+// desk; out is `docker info` "<MemTotal bytes> <NCPU> <Name>".
+func resourceWarning(out string) string {
+	fields := strings.Fields(out)
+	if len(fields) < 2 {
+		return ""
+	}
+	mem, err := strconv.ParseInt(fields[0], 10, 64)
+	if err != nil || mem >= minDockerMemory {
+		return ""
+	}
+	how := "Docker Desktop → Settings → Resources → Memory"
+	if len(fields) > 2 && strings.Contains(strings.ToLower(fields[2]), "colima") {
+		how = "colima stop && colima start --cpu 4 --memory 8"
+	}
+	return fmt.Sprintf("Warning: Docker has %.1f GB of memory; each desk needs about 4 GB, so desks may fail to start.\n"+
+		"Give Docker at least 8 GB: %s", float64(mem)/(1<<30), how)
 }
 
 func apiKey(path string) (string, error) {

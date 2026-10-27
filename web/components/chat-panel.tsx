@@ -218,6 +218,12 @@ function TaskBlock({
       {failedWithoutAnswer && (
         <p className="text-sm text-danger">✕ Task failed{lastError ? `: ${lastError.label}` : ""}</p>
       )}
+      {t.help && (
+        <div className="rounded-md border border-border bg-surface px-3 py-2 text-sm">
+          <p className="text-xs font-medium text-muted">What to do</p>
+          <Markdown text={t.help} />
+        </div>
+      )}
       {t.status === "stopped" && <p className="text-xs text-muted">■ Stopped</p>}
       {t.status === "paused" && <p className="text-xs text-muted">⏸ You took over the desk</p>}
     </div>

@@ -228,8 +228,18 @@ func (r *Runner) run(task Task, cont bool) {
 			}
 		}
 		r.finish(ctx, task, out)
+		if out.failed() {
+			if help := explainFailure(strings.Join(out.problems, "\n"), out.limited, len(providers) > 1); help != "" {
+				r.store.Append(task.DeskID, Event{TaskID: task.ID, Kind: KindHelp, Text: help})
+			}
+		}
 		return
 	}
+}
+
+// failed reports whether the attempt ended the task as failed.
+func (o outcome) failed() bool {
+	return !o.stopped && (o.err != nil || !o.sawResult || o.resultError)
 }
 
 // rest skips a provider until its usage limit lifts.
@@ -262,6 +272,7 @@ type outcome struct {
 	resultError bool
 	limited     bool   // the provider refused with a usage limit
 	limitText   string // its message, which may say when the limit lifts
+	problems    []string
 }
 
 // attempt runs the agent once with one provider, streaming its events.
@@ -298,6 +309,9 @@ func (r *Runner) attempt(ctx context.Context, task Task, cont bool, p Provider) 
 					out.limited = true
 					out.limitText = ev.Text
 				}
+			}
+			if (ev.Kind == KindResult && ev.IsError) || ev.Kind == KindError {
+				out.problems = append(out.problems, ev.Text)
 			}
 			mu.Unlock()
 			ev.TaskID = task.ID

@@ -373,3 +373,23 @@ func TestStoreSurvivesRestart(t *testing.T) {
 		t.Errorf("removed desk's chat not archived: %v", err)
 	}
 }
+
+func TestRunnerExplainsKnownFailures(t *testing.T) {
+	r, _ := newTestRunner(`{"type":"result","subtype":"error","is_error":true,"result":"API Error: 500 ConnectError: [Errno -2] Name or service not known"}` + "\n")
+	r.Start("d", "x")
+	waitIdle(t, r.Store(), "d")
+	evs := r.Store().Events("d", 0)
+	last := evs[len(evs)-1]
+	if last.Kind != KindHelp || !strings.Contains(last.Text, "couldn't reach") {
+		t.Errorf("last event = %+v, want help", last)
+	}
+
+	r2, _ := newTestRunner(sampleRun)
+	r2.Start("d", "x")
+	waitIdle(t, r2.Store(), "d")
+	for _, ev := range r2.Store().Events("d", 0) {
+		if ev.Kind == KindHelp {
+			t.Errorf("help on a successful task: %+v", ev)
+		}
+	}
+}

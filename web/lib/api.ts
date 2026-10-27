@@ -34,6 +34,7 @@ export type EventKind =
   | "error"
   | "status"
   | "log"
+  | "help"
   | "access_request"
   | "access_decision";
 
