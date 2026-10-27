@@ -64,6 +64,8 @@ Releases are published by pushing a version tag (`git tag v0.1.0 && git push ori
 | `shortdesk up` | Start everything and open the dashboard |
 | `shortdesk down` | Stop the background services (desks, files and logins are kept) |
 | `shortdesk update` | Update to the latest release (checked against its checksum) |
+| `shortdesk backup [--files]` | Save settings, keys, the vault, logins and chats (and shared folders) to one private file |
+| `shortdesk restore <file>` | Restore a backup; your current data is moved aside, never deleted |
 | `shortdesk desk up -c <charter> [--name n] [--open]` | Start a desk and wait until its screen is ready |
 | `shortdesk desk list` | List desks with charter, tenant, state and expiry |
 | `shortdesk desk open [desk]` | Open the desk's screen in the browser |
