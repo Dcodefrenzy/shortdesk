@@ -56,8 +56,9 @@ func ensureImages(ctx context.Context, version string, rebuild bool, log func(st
 	return nil
 }
 
-// releaseVersion matches tagged releases (v1.2.3, v1.2.3-rc.1), not local builds.
-var releaseVersion = regexp.MustCompile(`^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$`)
+// releaseVersion matches tagged releases (v1.2.3, v1.2.3-rc.1), not local builds such
+// as v1.2.3-dirty or v1.2.3-4-gabc1234.
+var releaseVersion = regexp.MustCompile(`^v\d+\.\d+\.\d+(-(rc|alpha|beta)(\.?\d+)*)?$`)
 
 // sameImage reports whether both names exist locally and are the same image.
 func sameImage(ctx context.Context, a, b string) bool {
