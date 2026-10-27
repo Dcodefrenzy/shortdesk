@@ -87,6 +87,25 @@ func (s *Server) removeNetworkRule(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// setAllowAll turns "every website" on or off for one desk: {"on": true}.
+func (s *Server) setAllowAll(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		On bool `json:"on"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	d, ok := s.findDesk(w, r)
+	if !ok {
+		return
+	}
+	if err := s.access.SetAllowAll(r.Context(), d, req.On); err != nil {
+		writeError(w, accessStatus(err), err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // decideAccess answers an agent's access request: {"decision": "desk"|"charter"|"deny"}.
 func (s *Server) decideAccess(w http.ResponseWriter, r *http.Request) {
 	var req struct {

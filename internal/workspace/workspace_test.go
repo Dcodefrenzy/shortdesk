@@ -142,3 +142,23 @@ func TestRouterUsesOwnModelsThroughFCC(t *testing.T) {
 		t.Error("own-models mode without keys should explain what's missing")
 	}
 }
+
+func TestModelHosts(t *testing.T) {
+	s, _ := Open(filepath.Join(t.TempDir(), "ws.json"))
+	if got := s.ModelHosts(); len(got) != 0 {
+		t.Errorf("no keys: %v", got)
+	}
+	s.SetSecret(DeepSeekKey, "k1")
+	s.SetSecret(GeminiKey, "k2")
+	if got := strings.Join(s.ModelHosts(), ","); got != "generativelanguage.googleapis.com,api.deepseek.com" {
+		t.Errorf("defaults: %s", got)
+	}
+	s.SetRouter(Router{Mode: ModeAuto, Models: []string{"groq/llama-3.3-70b-versatile", "groq/other", "nvidia_nim/x/y"}})
+	if got := strings.Join(s.ModelHosts(), ","); got != "api.groq.com,integrate.api.nvidia.com" {
+		t.Errorf("router list: %s", got)
+	}
+	s.SetRouter(Router{Mode: ModeClaude})
+	if got := s.ModelHosts(); len(got) != 0 {
+		t.Errorf("claude only: %v", got)
+	}
+}

@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -274,6 +275,10 @@ var _ runtime.NetworkPolicy = (*Runtime)(nil)
 // SetAllowedHosts replaces a running sandbox's egress allowlist.
 func (r *Runtime) SetAllowedHosts(ctx context.Context, id string, hosts []string) error {
 	p := networkPolicy{DefaultAction: "deny", Egress: []networkRule{}}
+	if slices.Equal(hosts, runtime.AllowAllHosts) {
+		p.DefaultAction = "allow"
+		hosts = nil
+	}
 	for _, h := range hosts {
 		p.Egress = append(p.Egress, networkRule{Action: "allow", Target: h})
 	}

@@ -33,6 +33,8 @@ type Config struct {
 	// WebDir, if set, is served at / (the built dashboard); otherwise Web is.
 	WebDir string
 	Web    fs.FS
+	// AccessFile keeps per-desk website rules across restarts; empty keeps them in memory.
+	AccessFile string
 	// SecureCookies marks the session cookie Secure (set when served over HTTPS).
 	SecureCookies bool
 	// ReadyTimeout bounds how long creating a desk waits for its screen.
@@ -58,7 +60,7 @@ func New(cfg Config, desks *desk.Manager, runner *agent.Runner, ws *workspace.St
 	if cfg.ReadyTimeout == 0 {
 		cfg.ReadyTimeout = 90 * time.Second
 	}
-	return &Server{
+	s := &Server{
 		cfg: cfg, desks: desks, agent: runner, workspace: ws, log: log,
 		access:   access.New(desks, runner, cfg.ChartersDir, log),
 		logins:   lg,
@@ -66,6 +68,12 @@ func New(cfg Config, desks *desk.Manager, runner *agent.Runner, ws *workspace.St
 		vault:    v,
 		viewer:   newViewerProxy(desks, log),
 	}
+	if cfg.AccessFile != "" {
+		if err := s.access.Persist(cfg.AccessFile); err != nil {
+			log.Warn("could not load saved website rules", "err", err)
+		}
+	}
+	return s
 }
 
 // Handler returns the server's routes.
@@ -100,6 +108,7 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("GET /api/desks/{id}/outputs/{path...}", s.getOutput)
 	authed.HandleFunc("POST /api/desks/{id}/network", s.addNetworkRule)
 	authed.HandleFunc("DELETE /api/desks/{id}/network/{host}", s.removeNetworkRule)
+	authed.HandleFunc("PUT /api/desks/{id}/network/allow-all", s.setAllowAll)
 	authed.HandleFunc("POST /api/desks/{id}/access/{requestId}", s.decideAccess)
 	authed.HandleFunc("GET /api/logins", s.listLogins)
 	authed.HandleFunc("GET /api/vault", s.vaultStatus)

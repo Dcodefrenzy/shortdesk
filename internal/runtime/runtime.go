@@ -101,6 +101,7 @@ type Shell interface {
 // allowlist without restarting it.
 type NetworkPolicy interface {
 	// SetAllowedHosts replaces the box's allowlist; all other hosts are denied.
+	// AllowAllHosts (["*"]) allows every host.
 	SetAllowedHosts(ctx context.Context, id string, hosts []string) error
 }
 
@@ -111,3 +112,6 @@ type Files interface {
 	// Download copies the file at path inside the box to w.
 	Download(ctx context.Context, id, path string, w io.Writer) error
 }
+
+// AllowAllHosts is the allowlist that allows every host.
+var AllowAllHosts = []string{"*"}

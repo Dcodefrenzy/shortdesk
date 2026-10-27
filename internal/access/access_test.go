@@ -193,3 +193,85 @@ func TestDecideDenyChangesNothing(t *testing.T) {
 		t.Errorf("policy changed on deny: %v", e.rt.Policy(d.ID))
 	}
 }
+
+func TestModelHostsAreAllowedAndAppliedToRunningDesks(t *testing.T) {
+	e := newEnv(t)
+	d := e.up(t, "d1")
+	ctx := context.Background()
+
+	models := []string{"api.deepseek.com", "claude.ai"} // claude.ai is already in the charter
+	e.desks.SetExtraAllowedHosts(func() []string { return models })
+	r, _ := e.m.Rules(d)
+	if hosts(r) != "claude.ai(charter),api.deepseek.com(models)" {
+		t.Errorf("rules = %s", hosts(r))
+	}
+	if err := e.m.ApplyAll(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(e.rt.Policy(d.ID), ","); got != "claude.ai,api.deepseek.com" {
+		t.Errorf("applied = %s", got)
+	}
+}
+
+func TestAllowAllSwitch(t *testing.T) {
+	e := newEnv(t)
+	d := e.up(t, "d1")
+	ctx := context.Background()
+	if err := e.m.Add(ctx, d, "booking.com", SourceSettings); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := e.m.SetAllowAll(ctx, d, true); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := e.m.Rules(d)
+	if !r.AllowAll || hosts(r) != "claude.ai(charter),booking.com(settings)" {
+		t.Errorf("on: allowAll=%v rules=%s", r.AllowAll, hosts(r))
+	}
+	if got := strings.Join(e.rt.Policy(d.ID), ","); got != "*" {
+		t.Errorf("on: applied = %s", got)
+	}
+
+	// Turning it off restores exactly the rules from before.
+	if err := e.m.SetAllowAll(ctx, d, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(e.rt.Policy(d.ID), ","); got != "claude.ai,booking.com" {
+		t.Errorf("off: applied = %s", got)
+	}
+
+	e.m.Forget(d.ID)
+	if r, _ := e.m.Rules(d); r.AllowAll {
+		t.Error("allow-all survived Forget")
+	}
+}
+
+func TestPersistKeepsRulesAcrossRestarts(t *testing.T) {
+	e := newEnv(t)
+	d := e.up(t, "d1")
+	ctx := context.Background()
+	file := filepath.Join(t.TempDir(), "access.json")
+	if err := e.m.Persist(file); err != nil {
+		t.Fatal(err)
+	}
+	e.m.Add(ctx, d, "booking.com", SourceChat)
+	e.m.SetAllowAll(ctx, d, true)
+
+	// A new Manager (as after a restart) reading the same file.
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	again := New(e.desks, agent.NewRunner(e.rt, agent.NewStore(), agent.Config{}, log), filepath.Dir(e.path), log)
+	if err := again.Persist(file); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := again.Rules(d)
+	if !r.AllowAll || hosts(r) != "claude.ai(charter),booking.com(chat)" {
+		t.Errorf("after restart: allowAll=%v rules=%s", r.AllowAll, hosts(r))
+	}
+
+	again.Forget(d.ID)
+	third := New(e.desks, agent.NewRunner(e.rt, agent.NewStore(), agent.Config{}, log), filepath.Dir(e.path), log)
+	third.Persist(file)
+	if r, _ := third.Rules(d); r.AllowAll || hosts(r) != "claude.ai(charter)" {
+		t.Errorf("after forget: allowAll=%v rules=%s", r.AllowAll, hosts(r))
+	}
+}

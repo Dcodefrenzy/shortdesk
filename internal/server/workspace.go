@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/shortdesk/shortdesk/internal/workspace"
@@ -34,6 +35,7 @@ func (s *Server) setRouter(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	s.modelsChanged(r.Context())
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -50,5 +52,18 @@ func (s *Server) setConnection(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	s.modelsChanged(r.Context())
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// RefreshDesks re-applies every running desk's website rules, e.g. at startup for desks
+// created before the router's models changed.
+func (s *Server) RefreshDesks(ctx context.Context) { s.modelsChanged(ctx) }
+
+// modelsChanged lets running desks reach the router's models as they are now. A desk
+// that can't be updated keeps its old rules; the change is logged, not fatal.
+func (s *Server) modelsChanged(ctx context.Context) {
+	if err := s.access.ApplyAll(ctx); err != nil {
+		s.log.Warn("could not update desks' website rules for the router's models", "err", err)
+	}
 }

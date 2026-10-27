@@ -146,3 +146,28 @@ func TestReadExecStreamTruncated(t *testing.T) {
 		t.Error("expected error for stream without completion")
 	}
 }
+
+func TestSetAllowedHosts(t *testing.T) {
+	for _, tc := range []struct {
+		hosts []string
+		want  string
+	}{
+		{[]string{"claude.ai", "*.booking.com"}, `{"defaultAction":"deny","egress":[{"action":"allow","target":"claude.ai"},{"action":"allow","target":"*.booking.com"}]}`},
+		{runtime.AllowAllHosts, `{"defaultAction":"allow","egress":[]}`},
+	} {
+		var got string
+		r := newTestRuntime(t, func(w http.ResponseWriter, req *http.Request) {
+			if req.Method != http.MethodPut || req.URL.Path != "/v1/sandboxes/box1/networkpolicy" {
+				t.Errorf("request = %s %s", req.Method, req.URL.Path)
+			}
+			b, _ := io.ReadAll(req.Body)
+			got = strings.TrimSpace(string(b))
+		})
+		if err := r.SetAllowedHosts(context.Background(), "box1", tc.hosts); err != nil {
+			t.Fatal(err)
+		}
+		if got != tc.want {
+			t.Errorf("%v: sent %s\nwant %s", tc.hosts, got, tc.want)
+		}
+	}
+}

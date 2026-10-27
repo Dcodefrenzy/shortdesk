@@ -34,6 +34,14 @@ const (
 // Connections lists the AI connections shown in Workspace settings, in display order.
 var Connections = []string{ClaudeToken, AnthropicKey, GeminiKey, DeepSeekKey, GroqKey, NvidiaKey}
 
+// providerHosts are the API hosts FCC calls for each provider (its default base URLs).
+var providerHosts = map[string]string{
+	"gemini":     "generativelanguage.googleapis.com",
+	"deepseek":   "api.deepseek.com",
+	"groq":       "api.groq.com",
+	"nvidia_nim": "integrate.api.nvidia.com",
+}
+
 // fccKeys maps model-key connections to the variable FCC reads, and gives each provider
 // a default model (FCC's "<provider>/<model-id>" format) for when the owner picks none.
 var fccKeys = []struct{ Secret, Env, DefaultModel string }{
@@ -231,6 +239,22 @@ func (s *Store) OwnModels() []string {
 		}
 	}
 	return out
+}
+
+// ModelHosts returns the API hosts the router's own models need, so desks with a
+// website allowlist can still reach them. None when the router uses Claude only.
+func (s *Store) ModelHosts() []string {
+	if s.Router().Mode == ModeClaude {
+		return nil
+	}
+	var hosts []string
+	for _, m := range s.OwnModels() {
+		provider, _, _ := strings.Cut(m, "/")
+		if h, ok := providerHosts[provider]; ok && !slices.Contains(hosts, h) {
+			hosts = append(hosts, h)
+		}
+	}
+	return hosts
 }
 
 // ownModelsEnv is what the agent run needs to use the owner's models through FCC:

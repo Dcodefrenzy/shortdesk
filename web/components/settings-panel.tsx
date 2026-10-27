@@ -12,6 +12,7 @@ const sourceLabel: Record<NetworkRule["source"], string> = {
   charter: "from charter",
   settings: "added here",
   chat: "approved in chat",
+  models: "for your models",
 };
 
 export function SettingsPanel({ deskId }: { deskId: string }) {
@@ -121,12 +122,37 @@ export function SettingsPanel({ deskId }: { deskId: string }) {
             <p className="text-sm text-warn">This charter allows every website.</p>
           ) : (
             <>
-              <ul className="divide-y divide-border rounded-md border border-border">
+              {network.editable && (
+                <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-md border border-border p-3">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    className="mt-0.5 size-4 accent-[var(--color-accent)]"
+                    checked={network.allowAll}
+                    disabled={busy}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      run(() => api.setAllowAll(deskId, on));
+                    }}
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">Allow all websites</span>
+                    <span className="block text-xs text-muted">
+                      {network.allowAll
+                        ? "This desk can reach any website. Turn off to go back to the list below."
+                        : "Let this desk reach any website for now. The list below is kept for when you turn it off."}
+                    </span>
+                  </span>
+                </label>
+              )}
+              <ul
+                className={`divide-y divide-border rounded-md border border-border ${network.allowAll ? "opacity-50" : ""}`}
+              >
                 {network.hosts.map((r) => (
                   <li key={r.host} className="flex items-center gap-3 px-3 py-2 text-sm">
                     <span className="flex-1 font-mono">{r.host}</span>
                     <span className="text-xs text-muted">{sourceLabel[r.source]}</span>
-                    {r.source !== "charter" && network.editable && (
+                    {(r.source === "settings" || r.source === "chat") && network.editable && (
                       <Button variant="ghost" disabled={busy} onClick={() => run(() => api.removeHost(deskId, r.host))}>
                         Remove
                       </Button>

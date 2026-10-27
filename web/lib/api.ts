@@ -38,12 +38,12 @@ export type EventKind =
 
 export type AccessDecision = "desk" | "charter" | "deny";
 
-export type NetworkRule = { host: string; source: "charter" | "settings" | "chat"; addedAt?: string };
+export type NetworkRule = { host: string; source: "charter" | "settings" | "chat" | "models"; addedAt?: string };
 
 export type DeskSettings = {
   desk: Desk;
   charter?: Charter & { version?: number };
-  network: { unrestricted: boolean; editable: boolean; hosts: NetworkRule[] };
+  network: { unrestricted: boolean; editable: boolean; allowAll: boolean; hosts: NetworkRule[] };
   apps: { name: string; description: string; installed: boolean }[];
   integrations: string[];
   logins: DeskLogin[];
@@ -147,6 +147,8 @@ export const api = {
     `${desk(id)}/outputs/${path.split("/").map(encodeURIComponent).join("/")}${mode ? `?${mode}=1` : ""}`,
   allowHost: (id: string, host: string) =>
     request<void>(`${desk(id)}/network`, { method: "POST", body: JSON.stringify({ host }) }),
+  setAllowAll: (id: string, on: boolean) =>
+    request<void>(`${desk(id)}/network/allow-all`, { method: "PUT", body: JSON.stringify({ on }) }),
   removeHost: (id: string, host: string) =>
     request<void>(`${desk(id)}/network/${encodeURIComponent(host)}`, { method: "DELETE" }),
   logins: () => request<Login[]>("/api/logins"),

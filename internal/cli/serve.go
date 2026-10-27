@@ -87,6 +87,7 @@ func runServe(cmd *cobra.Command, o serveOptions) error {
 	if err != nil {
 		return err
 	}
+	m.SetExtraAllowedHosts(ws.ModelHosts)
 	chats, err := agent.OpenStore(filepath.Join(base, "chats"))
 	if err != nil {
 		return err
@@ -102,12 +103,14 @@ func runServe(cmd *cobra.Command, o serveOptions) error {
 	} else if err := v.Provision(cmd.Context()); err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: vault not set up (%v); credentials won't work until it is.\n", err)
 	}
-	cfg := server.Config{Token: token, ChartersDir: o.chartersDir, WebDir: o.webDir, SecureCookies: o.secure}
+	cfg := server.Config{Token: token, ChartersDir: o.chartersDir, WebDir: o.webDir, SecureCookies: o.secure,
+		AccessFile: filepath.Join(base, "access.json")}
 	if o.webDir == "" {
 		cfg.Web = webui.FS()
 	}
 	app := server.New(cfg, m, runner, ws, lg, v, log)
 	go app.CaptureLogins(cmd.Context(), loginCaptureEvery)
+	go app.RefreshDesks(cmd.Context())
 
 	ln, err := net.Listen("tcp", o.addr)
 	if err != nil {

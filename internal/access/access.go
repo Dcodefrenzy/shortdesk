@@ -7,9 +7,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -26,6 +28,7 @@ const (
 	SourceCharter  = "charter"
 	SourceSettings = "settings" // added in the desk's Settings tab
 	SourceChat     = "chat"     // approved from an agent's request
+	SourceModels   = "models"   // the API of a model the router uses (Workspace settings)
 )
 
 // Decision answers an agent's access request.
@@ -52,16 +55,20 @@ type Rule struct {
 
 // Rules is a desk's effective network access.
 type Rules struct {
-	Unrestricted bool   `json:"unrestricted"`
-	Editable     bool   `json:"editable"`
-	Hosts        []Rule `json:"hosts"`
+	Unrestricted bool `json:"unrestricted"` // the charter allows every website
+	Editable     bool `json:"editable"`
+	// AllowAll is the owner's switch to let this desk reach every website for now.
+	// Hosts still lists the rules that apply again when it is turned off.
+	AllowAll bool   `json:"allowAll"`
+	Hosts    []Rule `json:"hosts"`
 }
 
 type request struct {
 	deskID, host string
 }
 
-// Manager keeps per-desk additions in memory and applies them to running desks.
+// Manager keeps per-desk additions (in a file, with Persist) and applies them to
+// running desks.
 type Manager struct {
 	desks       *desk.Manager
 	runner      *agent.Runner
@@ -69,7 +76,9 @@ type Manager struct {
 	log         *slog.Logger
 
 	mu        sync.Mutex
+	path      string            // where additions are saved; empty keeps them in memory
 	overrides map[string][]Rule // desk ID -> added rules
+	allowAll  map[string]bool   // desk ID -> every website allowed
 	pending   map[string]request
 }
 
@@ -77,10 +86,59 @@ type Manager struct {
 func New(desks *desk.Manager, runner *agent.Runner, chartersDir string, log *slog.Logger) *Manager {
 	m := &Manager{
 		desks: desks, runner: runner, chartersDir: chartersDir, log: log,
-		overrides: map[string][]Rule{}, pending: map[string]request{},
+		overrides: map[string][]Rule{}, allowAll: map[string]bool{}, pending: map[string]request{},
 	}
 	runner.SetEventHook(m.onAgentEvent)
 	return m
+}
+
+// state is what Persist saves.
+type state struct {
+	Overrides map[string][]Rule `json:"overrides"`
+	AllowAll  map[string]bool   `json:"allowAll"`
+}
+
+// Persist loads per-desk additions from path and saves them there after every change,
+// so a restart keeps what the owner allowed.
+func (m *Manager) Persist(path string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.path = path
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var st state
+	if err := json.Unmarshal(b, &st); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	if st.Overrides != nil {
+		m.overrides = st.Overrides
+	}
+	if st.AllowAll != nil {
+		m.allowAll = st.AllowAll
+	}
+	return nil
+}
+
+// saveLocked writes the additions to the Persist file, if any. m.mu must be held.
+func (m *Manager) saveLocked() {
+	if m.path == "" {
+		return
+	}
+	b, err := json.MarshalIndent(state{Overrides: m.overrides, AllowAll: m.allowAll}, "", "  ")
+	if err == nil {
+		tmp := m.path + ".tmp"
+		if err = os.WriteFile(tmp, b, 0o600); err == nil {
+			err = os.Rename(tmp, m.path)
+		}
+	}
+	if err != nil {
+		m.log.Warn("could not save website rules", "path", m.path, "err", err)
+	}
 }
 
 // onAgentEvent gives each access request an ID so a human can answer it.
@@ -110,7 +168,13 @@ func (m *Manager) Rules(d desk.Desk) (Rules, error) {
 	for _, h := range c.Permissions.Network.Allow {
 		r.Hosts = append(r.Hosts, Rule{Host: h, Source: SourceCharter})
 	}
+	for _, h := range m.desks.ExtraAllowedHosts() {
+		if !hasHost(r.Hosts, h) {
+			r.Hosts = append(r.Hosts, Rule{Host: h, Source: SourceModels})
+		}
+	}
 	m.mu.Lock()
+	r.AllowAll = m.allowAll[d.ID]
 	for _, o := range m.overrides[d.ID] {
 		if !hasHost(r.Hosts, o.Host) {
 			r.Hosts = append(r.Hosts, o)
@@ -138,8 +202,60 @@ func (m *Manager) Add(ctx context.Context, d desk.Desk, host, source string) err
 	}
 	m.mu.Lock()
 	m.overrides[d.ID] = append(m.overrides[d.ID], Rule{Host: host, Source: source, AddedAt: time.Now()})
+	m.saveLocked()
 	m.mu.Unlock()
 	return m.apply(ctx, d)
+}
+
+// SetAllowAll lets the desk reach every website (on) or only its rules again (off).
+func (m *Manager) SetAllowAll(ctx context.Context, d desk.Desk, on bool) error {
+	rules, err := m.Rules(d)
+	if err != nil {
+		return err
+	}
+	if !rules.Editable {
+		return ErrNotEditable
+	}
+	m.mu.Lock()
+	prev := m.allowAll[d.ID]
+	if on {
+		m.allowAll[d.ID] = true
+	} else {
+		delete(m.allowAll, d.ID)
+	}
+	m.mu.Unlock()
+	err = m.apply(ctx, d)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err != nil {
+		if prev {
+			m.allowAll[d.ID] = true
+		} else {
+			delete(m.allowAll, d.ID)
+		}
+		return err
+	}
+	m.saveLocked()
+	return nil
+}
+
+// ApplyAll pushes every running desk's rules again, e.g. after the router's models
+// changed. Desks whose rules can't change are skipped.
+func (m *Manager) ApplyAll(ctx context.Context) error {
+	all, err := m.desks.List(ctx)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, d := range all {
+		if rules, err := m.Rules(d); err != nil || !rules.Editable {
+			continue
+		}
+		if err := m.apply(ctx, d); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", d.Name, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // Remove takes back a per-desk addition. Charter rules can only change in the charter.
@@ -148,6 +264,9 @@ func (m *Manager) Remove(ctx context.Context, d desk.Desk, host string) error {
 	before := len(m.overrides[d.ID])
 	m.overrides[d.ID] = slices.DeleteFunc(m.overrides[d.ID], func(r Rule) bool { return r.Host == host })
 	removed := len(m.overrides[d.ID]) < before
+	if removed {
+		m.saveLocked()
+	}
 	m.mu.Unlock()
 	if !removed {
 		return fmt.Errorf("%s is not a rule added to this desk (charter rules are changed in the charter)", host)
@@ -236,6 +355,12 @@ func (m *Manager) apply(ctx context.Context, d desk.Desk) error {
 	if err != nil {
 		return err
 	}
+	if rules.Unrestricted {
+		return ErrNotEditable // never narrow a desk whose charter allows everything
+	}
+	if rules.AllowAll {
+		return np.SetAllowedHosts(ctx, d.ID, runtime.AllowAllHosts)
+	}
 	hosts := make([]string, 0, len(rules.Hosts))
 	for _, r := range rules.Hosts {
 		hosts = append(hosts, r.Host)
@@ -248,6 +373,8 @@ func (m *Manager) Forget(deskID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.overrides, deskID)
+	delete(m.allowAll, deskID)
+	m.saveLocked()
 	for id, r := range m.pending {
 		if r.deskID == deskID {
 			delete(m.pending, id)

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -54,9 +55,10 @@ type Desk struct {
 
 // Manager manages desks on one runtime.
 type Manager struct {
-	rt     runtime.Runtime
-	http   *http.Client
-	shared []runtime.Mount
+	rt         runtime.Runtime
+	http       *http.Client
+	shared     []runtime.Mount
+	extraHosts func() []string
 }
 
 // SharedFolders every desk gets: storage volumes managed by the runtime (not folders
@@ -68,6 +70,18 @@ var SharedFolders = []runtime.Mount{
 
 // ShareFolders attaches SharedFolders to every desk created after this call.
 func (m *Manager) ShareFolders() { m.shared = SharedFolders }
+
+// SetExtraAllowedHosts adds hosts that every desk with a website allowlist may reach on
+// top of its charter's, e.g. the APIs of the owner's models. fn is called each time.
+func (m *Manager) SetExtraAllowedHosts(fn func() []string) { m.extraHosts = fn }
+
+// ExtraAllowedHosts returns the hosts set with SetExtraAllowedHosts.
+func (m *Manager) ExtraAllowedHosts() []string {
+	if m.extraHosts == nil {
+		return nil
+	}
+	return m.extraHosts()
+}
 
 // Shared returns the folders every new desk gets.
 func (m *Manager) Shared() []runtime.Mount { return m.shared }
@@ -101,6 +115,13 @@ func (m *Manager) Up(ctx context.Context, c *charter.Charter, name string) (Desk
 
 	spec := specFor(c, name)
 	spec.Mounts = m.shared
+	if spec.AllowedHosts != nil {
+		for _, h := range m.ExtraAllowedHosts() {
+			if !slices.Contains(spec.AllowedHosts, h) {
+				spec.AllowedHosts = append(spec.AllowedHosts, h)
+			}
+		}
+	}
 	box, err := m.rt.Create(ctx, spec)
 	if err != nil {
 		return Desk{}, err
@@ -128,7 +149,7 @@ func specFor(c *charter.Charter, name string) runtime.Spec {
 		spec.Labels[LabelTenant] = c.Tenant
 	}
 	if !c.Permissions.Network.Unrestricted() {
-		spec.AllowedHosts = c.Permissions.Network.Allow
+		spec.AllowedHosts = slices.Clone(c.Permissions.Network.Allow)
 	}
 	return spec
 }
