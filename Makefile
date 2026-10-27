@@ -8,7 +8,8 @@ all: web build ## Dashboard + binary (what releases are built with)
 
 web: ## Build the dashboard and bundle it into the binary's sources
 	cd web && npm ci --no-audit --no-fund && npm run build
-	rm -rf internal/webui/dist && cp -R web/out internal/webui/dist
+	find internal/webui/dist -mindepth 1 -not -name README.md -exec rm -rf {} +
+	cp -R web/out/. internal/webui/dist/
 
 build: ## Build the shortdesk binary into bin/ (bundles whatever `make web` produced)
 	go build -ldflags "$(LDFLAGS)" -o bin/shortdesk ./cmd/shortdesk
