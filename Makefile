@@ -2,7 +2,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X github.com/shortdesk/shortdesk/internal/cli.Version=$(VERSION)
 DESK_IMAGE ?= shortdesk/desk:dev
 
-.PHONY: all web build test vet fmt check image clean
+.PHONY: all web build test vet fmt check image desk-binary clean
 
 all: web build ## Dashboard + binary (what releases are built with)
 
@@ -26,7 +26,13 @@ fmt:
 check: vet test ## Everything CI should run
 	@test -z "$$(gofmt -l .)" || (echo "gofmt needed:"; gofmt -l .; exit 1)
 
-image: ## Build the desk image
+DESK_ARCH ?= $(shell docker version -f '{{.Server.Arch}}' 2>/dev/null || go env GOARCH)
+
+desk-binary: ## Linux shortdesk for the desk image (the main desk runs the Phone Desk with it)
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(DESK_ARCH) go build -trimpath -ldflags "-s -w $(LDFLAGS)" \
+		-o images/desk/rootfs/usr/local/bin/shortdesk ./cmd/shortdesk
+
+image: desk-binary ## Build the desk image
 	docker build -t $(DESK_IMAGE) images/desk
 
 clean:

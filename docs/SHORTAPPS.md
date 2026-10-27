@@ -8,7 +8,8 @@ next to the chat.
 
 | Word | Meaning |
 |---|---|
-| **Main desk** | The always-on desk you chat with. It answers, files things, does quick jobs, and runs the apps. |
+| **Main desk** | The virtual desktop that never dies. Its agent answers you fast, orchestrates helper desks, and it runs the Phone Desk. |
+| **Phone Desk** | The software on the main desk that serves the mini apps (`shortdesk phone-host`). Apps and their data live on their own volume (`shortdesk-phone`), so they outlive any desk. |
 | **Helper desk** | Extra desks the main desk starts for long jobs, and puts to sleep after. |
 | **ShortApp** | A small app on the phone that holds and shows information (Tasks, Messages, Berlin flats…). Apps store and show; agents do the work. |
 | **System app** | An app that is part of Shortdesk itself: Vault, Settings, Files, Store. |
@@ -36,17 +37,16 @@ Telegram is a way to talk to your main desk, never to apps directly.
 | Part | Choice |
 |---|---|
 | Screens | TypeScript + React, built to static files |
-| Runtime | Go, part of Shortdesk: serves every app, gives each one its data API from `app.json` |
+| Runtime | The Phone Desk (Go, `internal/phone`): installs apps, serves their pages walled off, gives each one its data API |
 | Custom logic | Optional small TypeScript functions |
 | Database | SQLite, one file per app, behind a data layer that can switch to Postgres |
-| Agent access | The same data API, through an `apps` tool / MCP |
+| Agent access | The same data API through the `apps` tool on every desk, with a key Shortdesk signs per task; MCP later |
 
 ```
 calories/
-  app.json      what it keeps (collections and fields), logins and connections it needs
-  web/          the screens
-  functions/    optional custom logic
-  data/app.db   its data: never published
+  app.json      id, name, icon, colour, description, version, collections, logins it needs
+  web/          the screens: index.html loads shortapps.js for its data
+  (data)        kept by the Phone Desk, one SQLite file per app: never published
 ```
 
 Publishing shares `app.json`, the code and screenshots, tagged with what it was copied
@@ -59,12 +59,15 @@ from. Never the data, never passwords (those live in the Vault).
    **Settings** (AI models, router, websites, shared folders, desk software, theme),
    **Files** (what the agent saved), **Store** (what's coming). Onboarding as a
    checklist on the phone's home screen. The chat talks to the main desk.
-2. **Main desk + helpers**: an always-on main desk, Tasks as the queue, helper desks
-   started and put to sleep automatically, scratchbooks.
-3. **App runtime**: `app.json` → data API, SQLite per app behind a switchable data
-   layer, apps served on the phone, the `apps` tool for agents.
-4. **First apps**: Messages, Tasks, Reminders (with the Scheduler and Telegram
-   notifications), Journal, Notes.
+2. **Phone Desk** (done): runs on the main desk, SQLite per app behind a switchable
+   data layer (`internal/appdata`), apps served walled off on the phone, the `apps`
+   tool for agents (use, message, task, build, install, undo). First apps: Messages,
+   Tasks (`shortapps/`).
+3. **Main desk + helpers**: the main desk never expires and orchestrates; it starts
+   helper desks with lifetimes for hard tasks, reads their scratchbooks, and keeps you
+   updated; the chat is always open.
+4. **More apps**: Token usage (spend and limits, a system app), Reminders (with the
+   Scheduler and Telegram notifications), Journal, Notes.
 5. **Store apps**: Price watch, Tracker (Berlin flats), Calendar, Contacts, Documents,
    Automations, Deliveries.
 6. **Publishing**: install, copy with a "copied from" tag, publish.

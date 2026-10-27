@@ -115,3 +115,10 @@ type Files interface {
 
 // AllowAllHosts is the allowlist that allows every host.
 var AllowAllHosts = []string{"*"}
+
+// PrivateNetwork is implemented by runtimes whose desks can reach each other directly,
+// e.g. helper desks reaching the Phone Desk on the main desk.
+type PrivateNetwork interface {
+	// PrivateAddr returns the desk's address on the network desks share.
+	PrivateAddr(ctx context.Context, id string) (string, error)
+}

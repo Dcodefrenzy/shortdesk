@@ -159,7 +159,8 @@ func TestShareFoldersAttachesToNewDesks(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := rt.Created[0].Mounts
-	if len(got) != 2 || got[0].Path != "/home/desk/Developer" || got[0].Volume != "shortdesk-developer" {
+	if len(got) != 3 || got[0].Path != "/home/desk/Developer" || got[0].Volume != "shortdesk-developer" ||
+		got[2].Volume != "shortdesk-phone" || got[2].Path != "/home/desk/.phone" {
 		t.Errorf("mounts = %+v", got)
 	}
 }

@@ -1,18 +1,15 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useState } from "react";
-import { ArtifactsPanel, PROJECT } from "@/components/artifacts-panel";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { PROJECT } from "@/components/artifacts-panel";
 import { ChatPanel } from "@/components/chat-panel";
 import { DesksView } from "@/components/desks-view";
 import { LogoMark } from "@/components/logo";
-import { appById, type AppId } from "@/components/phone/apps";
-import { ComingSoon, HomeScreen, Phone, useMinute, type Notice } from "@/components/phone/phone";
-import { SettingsApp, StoreApp, VaultApp } from "@/components/phone/system-apps";
 import { pending } from "@/components/project-review";
 import { StartDesk } from "@/components/start-desk";
 import { AgentBadge, ErrorNote } from "@/components/ui";
-import { api, type AgentState, type Desk, type Workspace } from "@/lib/api";
+import { api, type Desk } from "@/lib/api";
 import { timeLeft } from "@/lib/format";
 import { useAuthRedirect } from "@/lib/use-auth-redirect";
 import { useDeskEvents } from "@/lib/use-desk-events";
@@ -21,9 +18,8 @@ import { usePoll } from "@/lib/use-poll";
 
 type View = "chat" | "desktop";
 
-// The dashboard: chat with your agent (or watch its desks) on the left, the phone with
-// your apps on the right. The open app is in the address (/?app=vault), so links from
-// the agent's messages can open one.
+// The dashboard: chat with your agent (or watch its desks) on the left, and your
+// agent's phone on the right. A link like /?app=tasks opens that app on the phone.
 export default function Home() {
   return (
     <Suspense fallback={null}>
@@ -33,7 +29,6 @@ export default function Home() {
 }
 
 function Dashboard() {
-  const router = useRouter();
   const params = useSearchParams();
   const appId = params.get("app");
   const { data: desks, error, reload: reloadDesks } = usePoll(api.desks, 5000);
@@ -41,18 +36,37 @@ function Dashboard() {
   const loadError = useAuthRedirect(error);
   const [view, setView] = useState<View>("chat");
   const [deskSel, setDeskSel] = useState("");
-  const [fileSel, setFileSel] = useState<string | null>(null);
 
   const main = desks?.find((d) => d.id === ws?.mainDesk);
   const reload = useCallback(() => {
     reloadDesks();
     reloadWs();
   }, [reloadDesks, reloadWs]);
-  const openApp = useCallback((id: AppId | null) => router.replace(id ? `/?app=${id}` : "/"), [router]);
+  // The phone is its own page (/phone/), served beside the chat; links like /?app=tasks
+  // open that app on it.
+  const phone = useRef<HTMLIFrameElement>(null);
+  const [phoneSrc, setPhoneSrc] = useState(() => `/phone/?embed=1${appId ? `&app=${encodeURIComponent(appId)}` : ""}`);
+  const openApp = useCallback((id: string, path?: string) => {
+    const q = new URLSearchParams({ embed: "1", app: id });
+    if (path) q.set("path", path);
+    setPhoneSrc(`/phone/?${q}&t=${Date.now()}`);
+  }, []);
   const watch = (id: string) => {
     setDeskSel(id);
     setView("desktop");
   };
+  // The phone asks the dashboard to show a desk or the chat.
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.source !== phone.current?.contentWindow || e.origin !== location.origin || e.data?.shortdesk !== 1) return;
+      if (typeof e.data.watch === "string") {
+        setDeskSel(e.data.watch);
+        setView("desktop");
+      } else if (e.data.chat) setView("chat");
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col lg:h-screen lg:flex-row">
@@ -91,14 +105,8 @@ function Dashboard() {
               <MainChat
                 key={main.id}
                 desk={main}
-                onOpenOutput={(path) => {
-                  setFileSel(path);
-                  openApp("files");
-                }}
-                onOpenProject={(name) => {
-                  setFileSel(PROJECT + name);
-                  openApp("files");
-                }}
+                onOpenOutput={(path) => openApp("files", path)}
+                onOpenProject={(name) => openApp("files", PROJECT + name)}
                 onTakeOver={() => watch(main.id)}
               />
             ) : (
@@ -134,19 +142,8 @@ function Dashboard() {
         </div>
       </section>
 
-      <aside className="flex shrink-0 items-center justify-center border-t border-border bg-background/60 p-4 lg:w-[420px] lg:border-t-0 lg:border-l">
-        <PhonePanel
-          appId={appId}
-          openApp={openApp}
-          ws={ws}
-          desks={desks}
-          main={main}
-          fileSel={fileSel}
-          setFileSel={setFileSel}
-          onWatch={watch}
-          onChat={() => setView("chat")}
-          reload={reload}
-        />
+      <aside className="flex shrink-0 items-center justify-center border-t border-border bg-background/60 lg:w-[420px] lg:border-t-0 lg:border-l">
+        <iframe ref={phone} src={phoneSrc} title="Your agent's phone" className="h-[min(840px,100vh)] w-full max-w-[420px] border-0" />
       </aside>
     </div>
   );
@@ -179,120 +176,4 @@ function MainChat({
       onTakeOver={onTakeOver}
     />
   );
-}
-
-function PhonePanel({
-  appId,
-  openApp,
-  ws,
-  desks,
-  main,
-  fileSel,
-  setFileSel,
-  onWatch,
-  onChat,
-  reload,
-}: {
-  appId: string | null;
-  openApp: (id: AppId | null) => void;
-  ws?: Workspace;
-  desks?: Desk[];
-  main?: Desk;
-  fileSel: string | null;
-  setFileSel: (p: string | null) => void;
-  onWatch: (id: string) => void;
-  onChat: () => void;
-  reload: () => void;
-}) {
-  const app = appById(appId);
-  const notices = useNotices(ws, desks, main, openApp, onWatch, onChat);
-  return (
-    <Phone app={app} onHome={() => openApp(null)}>
-      {!app ? (
-        <HomeScreen
-          who={main ? `🤖 Your agent · ${agentWords[main.agent]}` : "🤖 Your agent · not started"}
-          notices={notices}
-          onOpen={(a) => openApp(a.id)}
-        />
-      ) : app.id === "vault" ? (
-        <VaultApp />
-      ) : app.id === "settings" ? (
-        <SettingsApp ws={ws} onChange={reload} mainDesk={main?.id} />
-      ) : app.id === "store" ? (
-        <StoreApp />
-      ) : app.id === "files" ? (
-        main ? (
-          <FilesApp desk={main} selected={fileSel} onSelect={setFileSel} onClose={() => openApp(null)} />
-        ) : (
-          <p className="p-3 text-sm text-muted">Start your main desk first; what your agent saves shows up here.</p>
-        )
-      ) : (
-        <ComingSoon app={app} />
-      )}
-    </Phone>
-  );
-}
-
-const agentWords: Record<AgentState, string> = { idle: "ready", working: "working", paused: "you're in control" };
-
-function FilesApp({
-  desk,
-  selected,
-  onSelect,
-  onClose,
-}: {
-  desk: Desk;
-  selected: string | null;
-  onSelect: (p: string | null) => void;
-  onClose: () => void;
-}) {
-  const { data: outputs = [] } = useOutputs(desk.id, desk.agent);
-  const { data: projects = [], reload } = useProjects(desk.id, desk.agent);
-  return (
-    <div className="-m-3 h-[calc(100%+24px)]">
-      <ArtifactsPanel
-        deskId={desk.id}
-        outputs={outputs}
-        projects={projects}
-        selected={selected}
-        onSelect={onSelect}
-        onClose={onClose}
-        onProjectsChanged={reload}
-      />
-    </div>
-  );
-}
-
-// What the home screen asks of you: getting started first, then what's happening now.
-function useNotices(
-  ws: Workspace | undefined,
-  desks: Desk[] | undefined,
-  main: Desk | undefined,
-  openApp: (id: AppId | null) => void,
-  onWatch: (id: string) => void,
-  onChat: () => void,
-): Notice[] {
-  const { data: logins } = usePoll(api.logins, 30000);
-  const { data: vault } = usePoll(api.vault, 30000);
-  const connected = !!vault?.connected;
-  const load = useCallback(() => (connected ? api.integrations() : Promise.resolve(undefined)), [connected]);
-  const { data: saved } = usePoll(load, 30000);
-  const minute = useMinute();
-  if (!ws || !desks) return [];
-  const out: Notice[] = [];
-  const aiReady = ws.connections.some((c) => c.set) || !!logins?.some((l) => l.kind === "app" && l.name === "claude-code");
-  if (!aiReady)
-    out.push({ icon: "🧠", title: "Connect an AI", text: "Claude, or your own model keys", action: { label: "Set up", onClick: () => openApp("settings") } });
-  if (!main) out.push({ icon: "🖥", title: "Start your main desk", text: "Your agent's computer", action: { label: "Start", onClick: onChat } });
-  if (main?.agent === "working")
-    out.push({ icon: "⚙️", title: "Your agent is working", text: main.name, action: { label: "Watch", onClick: () => onWatch(main.id) } });
-  if (main?.agent === "paused")
-    out.push({ icon: "✋", title: "You're in control of the desk", text: "The agent waits for you", action: { label: "Open", onClick: () => onWatch(main.id) } });
-  if (connected && saved && saved.length === 0)
-    out.push({ icon: "🔐", title: "Add your first login", text: "So your agent can sign in to sites", action: { label: "Vault", onClick: () => openApp("vault") } });
-  if (main && main.tasks === 0 && main.agent === "idle")
-    out.push({ icon: "💬", title: "Give your agent a job", text: "Type it in the chat", action: { label: "Chat", onClick: onChat } });
-  if (main?.expiresAt && minute > 0 && new Date(main.expiresAt).getTime() - minute * 60_000 < 15 * 60_000)
-    out.push({ icon: "⏳", title: "Main desk ends soon", text: `Removed in ${timeLeft(main.expiresAt)}` });
-  return out.slice(0, 3);
 }

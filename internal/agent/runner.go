@@ -43,6 +43,10 @@ own working copy with cd "$(desk-project open <name>)" (or desk-project new <nam
 clone <url> to clone one), work and commit there with clear messages, and commit before you finish. Your
 branch is merged into the project by the person, locally. Do not push to remote repositories unless asked.
 Keep other files worth keeping in ~/Files (also shared); don't delete others' work.
+The person has a phone of apps (ShortApps: Tasks, Messages, trackers, …) served by the Phone Desk. Run
+apps help to see them. Keep track of ongoing work in an app, not in loose files; tell the person things and ask
+them questions with apps message; add jobs with apps task. Read an app before changing it, and never undo the
+person's edits. To give them a new app, build it on your desk (apps new) and install it (apps install).
 Save results worth keeping in ~/outputs with clear file names, so the person can open and download them:
 tables as .csv, documents and reports as .md, plus images, PDFs or .html pages you make. Mention the files
 in your answer. Keep your answer itself short and readable.`
@@ -141,6 +145,7 @@ type Runner struct {
 	stopped map[string]bool      // task IDs a human stopped
 	resting map[string]time.Time // provider name -> skipped until (usage limit)
 	hook    func(deskID string, ev *Event)
+	prepare []func(ctx context.Context, deskID string) map[string]string
 	now     func() time.Time
 }
 
@@ -148,6 +153,14 @@ type Runner struct {
 func (r *Runner) SetEventHook(fn func(deskID string, ev *Event)) {
 	r.mu.Lock()
 	r.hook = fn
+	r.mu.Unlock()
+}
+
+// AddPrepare registers fn to run before each attempt at a task; the environment it
+// returns is given to the agent (e.g. the key for the person's apps).
+func (r *Runner) AddPrepare(fn func(ctx context.Context, deskID string) map[string]string) {
+	r.mu.Lock()
+	r.prepare = append(r.prepare, fn)
 	r.mu.Unlock()
 }
 
@@ -285,6 +298,14 @@ func (r *Runner) attempt(ctx context.Context, task Task, cont bool, p Provider) 
 	}
 	if cont {
 		env["SHORTDESK_CONTINUE"] = "--continue"
+	}
+	r.mu.Lock()
+	prepare := r.prepare
+	r.mu.Unlock()
+	for _, fn := range prepare {
+		for k, v := range fn(ctx, task.DeskID) {
+			env[k] = v
+		}
 	}
 	for k, v := range p.Env {
 		env[k] = v

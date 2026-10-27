@@ -10,7 +10,7 @@ import { SettingsPanel } from "../settings-panel";
 import { ThemeSwitch } from "../theme-switch";
 import { Button, Card, ErrorNote } from "../ui";
 import { LoginCatalog } from "../vault-logins";
-import { phoneApps, storeApps } from "./apps";
+import { storeApps, type PhoneApp } from "./apps";
 
 function Group({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
@@ -101,9 +101,9 @@ export function SettingsApp({ ws, onChange, mainDesk }: { ws?: Workspace; onChan
 }
 
 // Store: what's on the phone now, what's coming, and what will be installable.
-export function StoreApp() {
-  const installed = phoneApps.filter((a) => a.ready && a.id !== "store");
-  const soon = phoneApps.filter((a) => !a.ready);
+export function StoreApp({ apps }: { apps: PhoneApp[] }) {
+  const installed = apps.filter((a) => a.kind !== "soon" && a.id !== "store");
+  const soon = apps.filter((a) => a.kind === "soon");
   const row = (icon: string, name: string, about: string, right: ReactNode, tile = "bg-background") => (
     <li key={name} className="grid grid-cols-[40px_1fr_auto] items-center gap-3 px-3 py-2.5">
       <span className={`grid size-10 place-items-center rounded-[12px] text-xl ${tile}`}>{icon}</span>
@@ -120,7 +120,7 @@ export function StoreApp() {
   return (
     <div className="grid gap-3">
       <Group title="On your phone">
-        {list(installed.map((a) => row(a.icon, a.name, a.about, <span className="text-xs text-ok">Installed</span>, a.tile)))}
+        {list(installed.map((a) => row(a.icon, a.name, a.about, <span className="text-xs text-ok">Installed</span>, a.color ? "" : a.tile)))}
       </Group>
       <Group title="Coming to every phone">
         {list(soon.map((a) => row(a.icon, a.name, a.about, <span className="text-xs text-muted">Soon</span>, a.tile)))}

@@ -52,6 +52,7 @@ type Server struct {
 	projects  *projects.Manager
 	vault     *vault.Vault
 	viewer    *viewerProxy
+	phone     *phoneDesk
 	codes     loginCodes
 	log       *slog.Logger
 }
@@ -69,6 +70,8 @@ func New(cfg Config, desks *desk.Manager, runner *agent.Runner, ws *workspace.St
 		vault:    v,
 		viewer:   newViewerProxy(desks, log),
 	}
+	s.phone = newPhoneDesk(s)
+	runner.AddPrepare(s.phone.agentEnv)
 	if cfg.AccessFile != "" {
 		if err := s.access.Persist(cfg.AccessFile); err != nil {
 			log.Warn("could not load saved website rules", "err", err)
@@ -93,6 +96,8 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]bool{"authenticated": true})
 	})
 	authed.HandleFunc("GET /api/charters", s.listCharters)
+	authed.HandleFunc("GET /api/phone", s.phoneStatus)
+	authed.Handle("/phone/api/", s.phone)
 	authed.HandleFunc("GET /api/desks", s.listDesks)
 	authed.HandleFunc("POST /api/desks", s.createDesk)
 	authed.HandleFunc("GET /api/desks/{id}", s.getDesk)
@@ -129,6 +134,9 @@ func (s *Server) Handler() http.Handler {
 	protected := s.requireAuth(authed)
 	mux.Handle("/api/", protected)
 	mux.Handle("/desks/", protected)
+	mux.Handle("/phone/api/", protected)
+	// App pages load through short-lived signed paths the Phone Desk checks itself.
+	mux.Handle("GET /phone/apps/", s.phone)
 	switch {
 	case s.cfg.WebDir != "":
 		mux.Handle("/", http.FileServer(http.Dir(s.cfg.WebDir)))

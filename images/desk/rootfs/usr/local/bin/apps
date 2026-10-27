@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# apps: use and build ShortApps, the apps on the person's phone. They run on the Phone
+# Desk (served by the main desk); this tool talks to it with the key Shortdesk gives
+# each task (SHORTDESK_PHONE_URL, SHORTDESK_PHONE_KEY).
+set -euo pipefail
+
+die() { echo "apps: $*" >&2; exit 1; }
+
+usage() {
+  cat <<'EOF'
+ShortApps hold and show information for the person (tasks, messages, trackers…).
+You and the person both change them; read before you change, and never undo their edits.
+
+Using apps
+  apps list                                   installed apps
+  apps show <app>                             what the app is and keeps (app.json)
+  apps records <app> <collection> ['<query>'] records, newest first; query is JSON:
+                                              {"where":[{"field":"status","op":"=","value":"todo"}],
+                                               "orderBy":[{"field":"_updated","desc":true}],"limit":50}
+  apps add <app> <collection> '<json>'        add a record (prints it, with its id and version)
+  apps update <app> <collection> <id> '<json>' <version>
+                                              change fields (null removes one); version is the
+                                              one you read, so you can't overwrite a newer edit
+  apps delete <app> <collection> <id> <version>
+  apps history <app> [collection] [id]        who changed what
+
+Talking to the person
+  apps message "<about>" "<text>" [--ask "Yes, apply|Not yet"]
+                                              post in Messages, in the thread named <about>
+                                              (e.g. "Berlin flats"); --ask adds answer buttons,
+                                              separated by |
+  apps task "<title>" [todo|doing|waiting|done]   add to Tasks
+
+Building apps (on your desk, then install)
+  apps new <id> "<Name>" [emoji]              start one in ~/Developer/apps/<id>
+  apps install <folder>                       install or update it on the phone
+  apps undo <app>                             go back to the previous version
+
+An app is a folder: app.json (id, name, icon, color, description, version,
+collections) and web/index.html, which loads shortapps.js and uses
+shortapps.list/add/update/remove. Bump version on every install.
+EOF
+}
+
+[ -n "${SHORTDESK_PHONE_URL:-}" ] && [ -n "${SHORTDESK_PHONE_KEY:-}" ] \
+  || { [ "${1:-help}" = help ] || [ "${1:-}" = new ] || die "apps only work during a Shortdesk task (no phone key)"; }
+
+api() {
+  local method="$1" path="$2" body="${3:-}"
+  local args=(-sS -X "$method" -H "Authorization: Bearer ${SHORTDESK_PHONE_KEY}" -w '\n%{http_code}')
+  if [ -n "$body" ]; then args+=(-H 'Content-Type: application/json' --data-binary "$body"); fi
+  local out code
+  out=$(curl "${args[@]}" "${SHORTDESK_PHONE_URL%/}${path}") || die "can't reach the phone (is the main desk running?)"
+  code=${out##*$'\n'}
+  out=${out%$'\n'*}
+  if [ "$code" -ge 300 ]; then
+    die "$(printf '%s' "$out" | jq -r '.error // .' 2>/dev/null || printf '%s' "$out")"
+  fi
+  [ -z "$out" ] || printf '%s\n' "$out"
+}
+
+json_ok() { printf '%s' "$1" | jq -e 'type == "object"' >/dev/null 2>&1 || die "expected a JSON object, got: $1"; }
+
+cmd="${1:-help}"; shift || true
+case "$cmd" in
+  help|-h|--help) usage ;;
+  list)
+    api GET /api/apps | jq -r '.[] | "\(.id)\t\(.icon) \(.name) \(.version)\t\(.description)"' ;;
+  show)
+    [ $# -eq 1 ] || die "usage: apps show <app>"
+    api GET /api/apps | jq --arg a "$1" -e '.[] | select(.id == $a)' || die "no app '$1' (see: apps list)" ;;
+  records)
+    [ $# -ge 2 ] || die "usage: apps records <app> <collection> ['<query>']"
+    q="${3:-{\}}"; json_ok "$q"
+    api POST "/api/apps/$1/data/$2/query" "$q" | jq -c '.[] | {id, version, updatedBy, data}' ;;
+  add)
+    [ $# -eq 3 ] || die "usage: apps add <app> <collection> '<json>'"
+    json_ok "$3"
+    api POST "/api/apps/$1/data/$2" "$(jq -cn --argjson d "$3" '{data: $d}')" | jq -c '{id, version, data}' ;;
+  update)
+    [ $# -eq 5 ] || die "usage: apps update <app> <collection> <id> '<json>' <version>"
+    json_ok "$4"
+    api PATCH "/api/apps/$1/data/$2/$3" "$(jq -cn --argjson d "$4" --argjson v "$5" '{data: $d, version: $v}')" | jq -c '{id, version, data}' ;;
+  delete)
+    [ $# -eq 4 ] || die "usage: apps delete <app> <collection> <id> <version>"
+    api DELETE "/api/apps/$1/data/$2/$3?version=$4" && echo "Deleted $3." ;;
+  history)
+    [ $# -ge 1 ] || die "usage: apps history <app> [collection] [id]"
+    api GET "/api/apps/$1/history?coll=${2:-}&id=${3:-}&limit=50" | jq -r '.[] | "\(.time)\t\(.actor)\t\(.action) \(.collection)/\(.record)"' ;;
+  message)
+    [ $# -ge 2 ] || die 'usage: apps message "<about>" "<text>" [--ask "Yes, apply|Not yet"]'
+    about="$1" text="$2" options="[]"
+    if [ "${3:-}" = "--ask" ]; then options=$(jq -cn --arg o "${4:-}" '$o | split("|") | map(gsub("^ +| +$"; "")) | map(select(. != ""))'); fi
+    api POST /api/apps/messages/data/messages \
+      "$(jq -cn --arg t "$about" --arg x "$text" --argjson o "$options" '{data: ({thread: $t, from: "agent", text: $x} + (if ($o | length) > 0 then {options: $o} else {} end))}')" \
+      | jq -r '"Posted in Messages (\(.data.thread)): \(.id)"' ;;
+  task)
+    [ $# -ge 1 ] || die 'usage: apps task "<title>" [todo|doing|waiting|done]'
+    api POST /api/apps/tasks/data/tasks "$(jq -cn --arg t "$1" --arg s "${2:-todo}" '{data: {title: $t, status: $s}}')" \
+      | jq -r '"Added to Tasks: \(.id)"' ;;
+  new)
+    [ $# -ge 2 ] || die 'usage: apps new <id> "<Name>" [emoji]'
+    id="$1" name="$2" icon="${3:-🧩}"
+    [[ "$id" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]] || die "id: lower case letters, digits and dashes"
+    dir="$HOME/Developer/apps/$id"
+    [ ! -e "$dir" ] || die "$dir already exists"
+    mkdir -p "$dir/web"
+    jq -n --arg id "$id" --arg n "$name" --arg i "$icon" \
+      '{id: $id, name: $n, icon: $i, color: "#e3d1ff", description: "What this app is for, in one sentence.", version: "0.1.0", collections: ["items"]}' > "$dir/app.json"
+    cat > "$dir/web/index.html" <<HTML
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$name</title>
+<style>
+  /* The phone sends its colours: use these so the app matches light and dark mode. */
+  :root { --background: #f5f6f7; --surface: #fff; --foreground: #15181b; --muted: #62686f; --border: #e2e5e8; --accent: #1d7a63; --accent-foreground: #fff; }
+  body { margin: 0; padding: 12px; background: var(--background); color: var(--foreground); font: 14px/1.45 system-ui, sans-serif; }
+  li { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px; list-style: none; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<ul id="list"></ul>
+<script src="shortapps.js"></script>
+<script>
+  async function render() {
+    const items = await shortapps.list("items");
+    document.getElementById("list").innerHTML = items.map((r) => "<li>" + JSON.stringify(r.data) + "</li>").join("") || "<li>Nothing yet.</li>";
+  }
+  shortapps.onChange(render);
+  shortapps.ready.then(render);
+</script>
+</body>
+</html>
+HTML
+    echo "Started $dir. Edit app.json and web/, then: apps install $dir" ;;
+  install)
+    [ $# -eq 1 ] && [ -f "$1/app.json" ] && [ -f "$1/web/index.html" ] || die "usage: apps install <folder with app.json and web/index.html>"
+    tmp=$(mktemp)
+    tar -czf "$tmp" -C "$1" app.json web
+    out=$(curl -sS -X POST -H "Authorization: Bearer ${SHORTDESK_PHONE_KEY}" -H 'Content-Type: application/gzip' \
+          --data-binary "@$tmp" -w '\n%{http_code}' "${SHORTDESK_PHONE_URL%/}/api/apps") || { rm -f "$tmp"; die "can't reach the phone"; }
+    rm -f "$tmp"
+    code=${out##*$'\n'}; out=${out%$'\n'*}
+    [ "$code" -lt 300 ] || die "$(printf '%s' "$out" | jq -r '.error // .')"
+    printf '%s' "$out" | jq -r '"Installed \(.icon) \(.name) \(.version). It is on the phone now."' ;;
+  undo)
+    [ $# -eq 1 ] || die "usage: apps undo <app>"
+    api POST "/api/apps/$1/undo" && echo "Went back to the previous version of $1." ;;
+  *) usage >&2; exit 2 ;;
+esac

@@ -1,0 +1,9 @@
+{
+  "id": "messages",
+  "name": "Messages",
+  "icon": "💬",
+  "color": "#b9e4ff",
+  "description": "Everything your agent needs to tell or ask you, sorted by what it's about.",
+  "version": "1.0.1",
+  "collections": ["messages"]
+}

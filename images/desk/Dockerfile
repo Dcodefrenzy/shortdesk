@@ -44,7 +44,7 @@ RUN UV_PYTHON_INSTALL_DIR=/opt/uv/python UV_TOOL_DIR=/opt/uv/tools UV_TOOL_BIN_D
 # Non-root desk user. Its home is the desk's persistent storage
 # (browser profile, logins, Claude config).
 RUN groupadd -g 1000 desk && useradd -m -u 1000 -g desk -G audio,video -s /bin/bash desk \
- && install -d -o desk -g desk /home/desk/Developer /home/desk/Files /home/desk/outputs \
+ && install -d -o desk -g desk /home/desk/Developer /home/desk/Files /home/desk/outputs /home/desk/.phone \
  && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 
 COPY rootfs/ /

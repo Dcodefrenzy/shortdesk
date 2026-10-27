@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os/exec"
 	"slices"
 	"strings"
 	"time"
@@ -286,4 +287,23 @@ func (r *Runtime) SetAllowedHosts(ctx context.Context, id string, hosts []string
 		return fmt.Errorf("update network policy: %w", err)
 	}
 	return nil
+}
+
+var _ runtime.PrivateNetwork = (*Runtime)(nil)
+
+// PrivateAddr returns the sandbox's address on the local Docker network. A sandbox's
+// network belongs to its egress sidecar, so that container holds the address.
+func (r *Runtime) PrivateAddr(ctx context.Context, id string) (string, error) {
+	if !r.cfg.LocalDocker {
+		return "", errors.New("desks can only reach each other when OpenSandbox runs on this machine's Docker")
+	}
+	out, err := exec.CommandContext(ctx, "docker", "inspect", "-f",
+		"{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}", "sandbox-egress-"+id).Output()
+	if err != nil {
+		return "", fmt.Errorf("desk %s address: %w", id, err)
+	}
+	for _, ip := range strings.Fields(string(out)) {
+		return ip, nil
+	}
+	return "", fmt.Errorf("desk %s has no network address", id)
 }

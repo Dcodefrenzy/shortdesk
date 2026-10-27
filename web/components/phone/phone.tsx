@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore, type ReactNode } from "react";
-import { phoneApps, type PhoneApp } from "./apps";
+import type { PhoneApp } from "./apps";
 
 // The clock ticks client-side only; the static page renders it empty.
 function subscribeClock(cb: () => void) {
@@ -26,24 +26,27 @@ export function useClock() {
 export function Phone({
   app,
   onHome,
+  bare,
   children,
 }: {
   app?: PhoneApp;
   onHome: () => void;
+  // bare fills the screen without the device frame (on a real phone).
+  bare?: boolean;
   children: ReactNode;
 }) {
   const { time } = useClock();
   const home = !app;
   return (
-    <div className="h-[min(800px,calc(100vh-32px))] w-full max-w-[370px] rounded-[46px] bg-[#0b0f0e] p-[11px] shadow-2xl">
+    <div className={bare ? "h-dvh w-full" : "h-[min(800px,calc(100vh-32px))] w-full max-w-[370px] rounded-[46px] bg-[#0b0f0e] p-[11px] shadow-2xl"}>
       <div
-        className={`flex h-full flex-col overflow-hidden rounded-[36px] ${
+        className={`flex h-full flex-col overflow-hidden ${bare ? "" : "rounded-[36px]"} ${
           home ? "bg-gradient-to-b from-[#1d7a63] via-[#13684f] to-[#0b4a3c] text-white" : "bg-background text-foreground"
         }`}
       >
         <div className="flex shrink-0 items-center justify-between px-6 pt-3 pb-1.5 text-[13px] font-semibold">
           <span className="w-12 tabular-nums">{time}</span>
-          <span className="h-[26px] w-24 rounded-full bg-[#0b0f0e]" aria-hidden />
+          <span className={`h-[26px] w-24 rounded-full ${bare ? "" : "bg-[#0b0f0e]"}`} aria-hidden />
           <span className="w-12 text-right text-[11px]">●●● 5G</span>
         </div>
         {app && (
@@ -78,15 +81,17 @@ export type Notice = {
 export function HomeScreen({
   who,
   notices,
+  apps: all,
   onOpen,
 }: {
   who: string;
   notices: Notice[];
+  apps: PhoneApp[];
   onOpen: (app: PhoneApp) => void;
 }) {
   const { time, date } = useClock();
   const [search, setSearch] = useState("");
-  const apps = phoneApps.filter((a) => a.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const apps = all.filter((a) => a.name.toLowerCase().includes(search.trim().toLowerCase()));
   return (
     <div className="grid gap-3">
       <div>
@@ -120,9 +125,12 @@ export function HomeScreen({
       <div className="grid grid-cols-4 gap-x-1.5 gap-y-4 pt-1">
         {apps.map((a) => (
           <button key={a.id} onClick={() => onOpen(a)} className="grid justify-items-center gap-1.5 text-[11.5px] font-medium [text-shadow:0_1px_2px_rgba(0,0,0,.3)]">
-            <span className={`relative grid size-[58px] place-items-center rounded-[16px] text-[27px] shadow-md [text-shadow:none] ${a.tile}`}>
+            <span
+              className={`relative grid size-[58px] place-items-center rounded-[16px] text-[27px] shadow-md [text-shadow:none] ${a.tile}`}
+              style={a.color ? { backgroundColor: a.color } : undefined}
+            >
               {a.icon}
-              {!a.ready && (
+              {a.kind === "soon" && (
                 <span className="absolute -right-1 -bottom-1 rounded-full bg-[#0b4a3c] px-1.5 text-[9px] font-semibold text-white ring-2 ring-[#13684f]">
                   soon
                 </span>
@@ -141,7 +149,9 @@ export function HomeScreen({
 export function ComingSoon({ app }: { app: PhoneApp }) {
   return (
     <div className="grid justify-items-center gap-3 px-3 pt-10 text-center">
-      <span className={`grid size-20 place-items-center rounded-[22px] text-4xl shadow-md ${app.tile}`}>{app.icon}</span>
+      <span className={`grid size-20 place-items-center rounded-[22px] text-4xl shadow-md ${app.tile}`} style={app.color ? { backgroundColor: app.color } : undefined}>
+        {app.icon}
+      </span>
       <h3 className="font-display text-xl">{app.name}</h3>
       <p className="text-sm text-muted">{app.about}</p>
       <p className="rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">Coming with the next update</p>

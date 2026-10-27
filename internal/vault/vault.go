@@ -190,8 +190,10 @@ func (v *Vault) Status(ctx context.Context) Status {
 	out, err := docker(ctx, nil, "inspect", "-f", "{{.State.Running}}", vaultContainer)
 	st := Status{URL: URL, Running: err == nil && strings.TrimSpace(out) == "true"}
 	st.Email = v.secrets.Secret(SecretEmail)
+	// Set up counts as connected: the vault unlocks itself on first use (after a
+	// restart there's no session until then).
 	v.mu.Lock()
-	st.Connected = v.session != ""
+	st.Connected = v.session != "" || v.secrets.Secret(SecretPassword) != ""
 	v.mu.Unlock()
 	return st
 }

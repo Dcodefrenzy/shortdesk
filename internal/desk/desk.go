@@ -66,6 +66,7 @@ type Manager struct {
 var SharedFolders = []runtime.Mount{
 	{Volume: "shortdesk-developer", Path: "/home/desk/Developer"}, // code projects
 	{Volume: "shortdesk-files", Path: "/home/desk/Files"},         // documents, downloads, anything to keep
+	{Volume: "shortdesk-phone", Path: "/home/desk/.phone"},        // the person's apps and their data (the Phone Desk's)
 }
 
 // ShareFolders attaches SharedFolders to every desk created after this call.

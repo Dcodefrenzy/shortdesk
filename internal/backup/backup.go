@@ -36,6 +36,9 @@ const (
 // Volumes are the shared folders' storage, as named in Docker.
 var Volumes = []string{"shortdesk-developer", "shortdesk-files"}
 
+// PhoneVolume holds the person's apps and their data; every backup includes it.
+const PhoneVolume = "shortdesk-phone"
+
 // skipped are paths under ~/.shortdesk that are rebuilt on start or only make sense on
 // this machine: OpenSandbox's settings and records, the vault's scratch space and the
 // vault CLI's session.
@@ -113,17 +116,20 @@ func Create(ctx context.Context, home, out string, files bool, log func(string, 
 	}
 
 	m := manifest{Version: 1, Created: time.Now().UTC()}
+	// The person's apps and their data are always kept; the shared folders on request.
+	vols := []string{PhoneVolume}
 	if files {
-		for _, vol := range Volumes {
-			if err := docker(ctx, nil, io.Discard, "volume", "inspect", vol); err != nil {
-				continue // never created
-			}
-			log("Adding shared folder %s…", vol)
-			if err := addVolume(ctx, tw, vol); err != nil {
-				return err
-			}
-			m.Volumes = append(m.Volumes, vol)
+		vols = append(vols, Volumes...)
+	}
+	for _, vol := range vols {
+		if err := docker(ctx, nil, io.Discard, "volume", "inspect", vol); err != nil {
+			continue // never created
 		}
+		log("Adding %s…", vol)
+		if err := addVolume(ctx, tw, vol); err != nil {
+			return err
+		}
+		m.Volumes = append(m.Volumes, vol)
 	}
 	b, _ := json.MarshalIndent(m, "", "  ")
 	if err := addBytes(tw, manifestName, b); err != nil {
@@ -264,10 +270,10 @@ func Restore(ctx context.Context, file, home string, files bool, log func(string
 		}
 		if vol, ok := strings.CutPrefix(name, "volumes/"); ok {
 			vol = strings.TrimSuffix(vol, ".tar")
-			if !files {
+			if !files && vol != PhoneVolume {
 				continue
 			}
-			if !slices.Contains(Volumes, vol) {
+			if !slices.Contains(Volumes, vol) && vol != PhoneVolume {
 				return movedTo, fmt.Errorf("unexpected shared folder %q in backup", vol)
 			}
 			if err := restoreVolume(ctx, tr, vol, log); err != nil {

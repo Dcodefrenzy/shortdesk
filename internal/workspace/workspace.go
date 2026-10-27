@@ -69,7 +69,7 @@ type Router struct {
 }
 
 // otherSecrets are stored here for other parts of Shortdesk but not shown as AI connections.
-var otherSecrets = []string{"vault_email", "vault_master_password"}
+var otherSecrets = []string{"vault_email", "vault_master_password", "phone_secret"}
 
 type file struct {
 	Secrets map[string]string `json:"secrets"`
