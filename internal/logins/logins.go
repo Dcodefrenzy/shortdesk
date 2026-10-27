@@ -137,7 +137,7 @@ func (m *Manager) Saved() []Login {
 
 // Desk lists saved logins with their status on one desk.
 func (m *Manager) Desk(ctx context.Context, deskID string) ([]DeskLogin, error) {
-	have, err := m.scan(ctx, deskID)
+	have, err := m.scan(ctx, deskID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (m *Manager) Desk(ctx context.Context, deskID string) ([]DeskLogin, error) 
 // Capture saves new or changed logins from a desk and gives them to the other running
 // desks. Logins revoked on this desk are ignored.
 func (m *Manager) Capture(ctx context.Context, deskID, deskName string, others []string) error {
-	have, err := m.scan(ctx, deskID)
+	have, err := m.scan(ctx, deskID, false)
 	if err != nil {
 		return err
 	}
@@ -267,9 +267,16 @@ func (m *Manager) isRevoked(deskID string, key Key) bool {
 	return m.idx.Revoked[deskID][key.String()]
 }
 
-func (m *Manager) scan(ctx context.Context, deskID string) ([]found, error) {
+// scan lists the logins on a desk. Normally a site counts only once the desk's browser
+// has visited it (so tracker cookies aren't saved as logins); all counts every site with
+// cookies, which is right for checking whether a login given to the desk is there.
+func (m *Manager) scan(ctx context.Context, deskID string, all bool) ([]found, error) {
+	args := []string{"list"}
+	if all {
+		args = append(args, "--all")
+	}
 	var out bytes.Buffer
-	if err := m.run(ctx, deskID, &out, "list"); err != nil {
+	if err := m.run(ctx, deskID, &out, args...); err != nil {
 		return nil, err
 	}
 	var res []found

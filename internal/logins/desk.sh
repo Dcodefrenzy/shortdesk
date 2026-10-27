@@ -2,7 +2,8 @@
 # Runs inside a desk (sent by Shortdesk, not installed in the image). Finds, exports,
 # imports and removes logins.
 #
-#   list                          one JSON line per login: {"kind","name","hash"}
+#   list [--all]                  one JSON line per login: {"kind","name","hash"}; sites
+#                                 count only when visited, unless --all (no hashes then)
 #   export <kind> <name> <file>   pack one login into <file>
 #   import <kind> <name> <file>   add a login exported from another desk
 #   remove <kind> <name>          log this desk out of one login
@@ -103,6 +104,7 @@ visited_sites() {
 }
 
 list() {
+  local all=${1:-}
   for app in $APPS; do
     read -r first _ <<<"$(app_files "$app")"
     if [ -s "$home/$first" ]; then
@@ -110,6 +112,11 @@ list() {
     fi
   done
   browser_running || return 0
+  if [ "$all" = --all ]; then
+    # Every site with cookies, e.g. logins given to this desk but not visited yet.
+    for site in $(cdp sites); do printf '{"kind":"site","name":"%s","hash":""}\n' "$site"; done
+    return 0
+  fi
   local visited
   visited=$(visited_sites)
   for site in $(cdp sites); do
@@ -162,9 +169,9 @@ remove_login() {
 }
 
 case "${1:-}" in
-  list) list ;;
+  list) list "${2:-}" ;;
   export) export_login "$2" "$3" "$4" ;;
   import) import_login "$2" "$3" "$4" ;;
   remove) remove_login "$2" "$3" ;;
-  *) echo "usage: list | export|import <kind> <name> <file> | remove <kind> <name>" >&2; exit 2 ;;
+  *) echo "usage: list [--all] | export|import <kind> <name> <file> | remove <kind> <name>" >&2; exit 2 ;;
 esac
