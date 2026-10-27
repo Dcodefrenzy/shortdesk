@@ -78,7 +78,7 @@ jobs:
       - name: Build binaries
         run: |
           REGISTRY="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
-          LDFLAGS="-s -w -X github.com/shortdesk/shortdesk/internal/cli.Version=$GITHUB_REF_NAME -X github.com/shortdesk/shortdesk/internal/stack.Registry=$REGISTRY"
+          LDFLAGS="-s -w -X github.com/shortdesk/shortdesk/internal/cli.Version=$GITHUB_REF_NAME -X github.com/shortdesk/shortdesk/internal/stack.Registry=$REGISTRY -X github.com/shortdesk/shortdesk/internal/update.Repo=$GITHUB_REPOSITORY"
           mkdir dist
           for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
             os=${target%/*}; arch=${target#*/}; name="shortdesk_${os}_${arch}"

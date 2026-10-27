@@ -28,6 +28,7 @@ automatically and kept in ~/.shortdesk. Run it again any time; it picks up where
 				return err
 			}
 			out := cmd.OutOrStdout()
+			noteNewVersion(cmd.Context(), out)
 			if _, err := stack.Up(cmd.Context(), stack.Options{
 				Dir:           filepath.Join(home, ".shortdesk"),
 				Version:       Version,

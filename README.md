@@ -35,6 +35,8 @@ shortdesk up
 
 `shortdesk up` downloads the desk images the first time (a few GB, once), starts everything and opens the dashboard. Log in with the token it prints, then create a desk. Stop with Ctrl+C; run `shortdesk up` again any time to carry on where you left off. Your settings, chats and logins live in `~/.shortdesk`.
 
+To update later, run `shortdesk update`; `shortdesk up` tells you when there's a new version.
+
 Prefer to download by hand? Every [release](https://github.com/Dcodefrenzy/shortdesk/releases) has the binary for each system.
 
 ### First steps
@@ -61,6 +63,7 @@ Releases are published by pushing a version tag (`git tag v0.1.0 && git push ori
 |---|---|
 | `shortdesk up` | Start everything and open the dashboard |
 | `shortdesk down` | Stop the background services (desks, files and logins are kept) |
+| `shortdesk update` | Update to the latest release (checked against its checksum) |
 | `shortdesk desk up -c <charter> [--name n] [--open]` | Start a desk and wait until its screen is ready |
 | `shortdesk desk list` | List desks with charter, tenant, state and expiry |
 | `shortdesk desk open [desk]` | Open the desk's screen in the browser |

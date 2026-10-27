@@ -60,6 +60,9 @@ func ensureImages(ctx context.Context, version string, rebuild bool, log func(st
 // as v1.2.3-dirty or v1.2.3-4-gabc1234.
 var releaseVersion = regexp.MustCompile(`^v\d+\.\d+\.\d+(-(rc|alpha|beta)(\.?\d+)*)?$`)
 
+// IsRelease reports whether version is a tagged release rather than a local build.
+func IsRelease(version string) bool { return releaseVersion.MatchString(version) }
+
 // sameImage reports whether both names exist locally and are the same image.
 func sameImage(ctx context.Context, a, b string) bool {
 	idA, errA := docker(ctx, "image", "inspect", "-f", "{{.Id}}", a)
