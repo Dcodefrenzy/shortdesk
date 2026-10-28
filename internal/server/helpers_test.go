@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -133,5 +134,75 @@ func TestMainDeskIsToldToUseHelpers(t *testing.T) {
 	}
 	if v, ok := env.server.phone.agentEnv(context.Background(), other.ID)[agent.ExtraPromptEnv]; ok {
 		t.Errorf("non-main desk got main instructions: %q", v)
+	}
+}
+
+func TestHelperQuestionsReachTheMainChat(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+	main := decode[deskJSON](t, env.do(t, "POST", "/api/desks", `{"charter":"assistant","name":"main"}`, true))
+	withPhone(t, env)
+	s := env.server
+
+	// First the helper hits a blocked site and asks; after the answer it finishes.
+	env.rt.ExecFunc = func(r runtime.ExecRequest) string {
+		p := r.Env["SHORTDESK_PROMPT"]
+		switch {
+		case strings.Contains(p, "You are a helper desk"):
+			tool, _ := json.Marshal(map[string]any{"type": "user", "message": map[string]any{"content": []any{
+				map[string]any{"type": "tool_result", "content": `SHORTDESK_ACCESS_REQUEST {"host":"service.berlin.de","reason":"official opening hours"}`}}}})
+			return string(tool) + "\n" + `{"type":"result","subtype":"success","result":"Waiting for service.berlin.de."}` + "\n"
+		case strings.Contains(p, "allowed access to service.berlin.de"):
+			return `{"type":"result","subtype":"success","result":"Mitte opens at 8:00."}` + "\n"
+		}
+		return `{"type":"result","subtype":"success","result":"ok"}` + "\n"
+	}
+	var j job
+	s.phoneCall(ctx, http.MethodPost, "/api/apps/tasks/data/tasks", map[string]any{"data": map[string]any{
+		"title": "Opening hours", "status": "queued", "runOn": "helper", "instructions": "Find them."}}, &j)
+	s.helpers.dispatch(ctx)
+
+	jobState := func(want string) job {
+		t.Helper()
+		var got job
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			s.phoneCall(ctx, http.MethodGet, "/api/apps/tasks/data/tasks/"+j.ID, nil, &got)
+			if got.str("status") == want {
+				return got
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("job status = %q, want %q", got.str("status"), want)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	jobState("waiting")
+
+	// The request shows in the main chat, pointing at the helper.
+	var req agent.Event
+	for _, ev := range s.agent.Store().Events(main.ID, 0) {
+		if ev.Kind == agent.KindAccessRequest {
+			req = ev
+		}
+	}
+	if req.Data["host"] != "service.berlin.de" || req.Data["desk"] == "" || req.Data["requestId"] == "" {
+		t.Fatalf("main chat request = %+v", req)
+	}
+
+	// Allowing it (on the helper's desk) lets the helper finish the job.
+	resp := env.do(t, "POST", "/api/desks/"+req.Data["desk"]+"/access/"+req.Data["requestId"], `{"decision":"desk"}`, true)
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("decide = %d", resp.StatusCode)
+	}
+	if got := jobState("done"); got.str("result") != "Mitte opens at 8:00." {
+		t.Errorf("result = %q", got.str("result"))
+	}
+	decided := false
+	for _, ev := range s.agent.Store().Events(main.ID, 0) {
+		decided = decided || (ev.Kind == agent.KindAccessDecision && ev.Data["requestId"] == req.Data["requestId"])
+	}
+	if !decided {
+		t.Error("the main chat didn't get the decision")
 	}
 }

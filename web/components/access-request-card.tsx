@@ -30,7 +30,8 @@ export function AccessRequestCard({
     setBusy(d);
     setError("");
     try {
-      await api.decideAccess(deskId, requestId, d);
+      // A helper's request shown in the main chat is answered on the helper's desk.
+      await api.decideAccess(ev.data?.desk || deskId, requestId, d);
     } catch (err) {
       setError((err as Error).message);
       setBusy(null);

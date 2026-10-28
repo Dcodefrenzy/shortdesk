@@ -76,6 +76,7 @@ func New(cfg Config, desks *desk.Manager, runner *agent.Runner, ws *workspace.St
 	s.helpers = newHelpers(s)
 	runner.AddPrepare(s.helpers.env)
 	runner.AfterTask(s.helpers.finished)
+	s.access.Forward(s.helpers.forward)
 	if cfg.AccessFile != "" {
 		if err := s.access.Persist(cfg.AccessFile); err != nil {
 			log.Warn("could not load saved website rules", "err", err)

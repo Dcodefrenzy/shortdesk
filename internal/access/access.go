@@ -80,6 +80,27 @@ type Manager struct {
 	overrides map[string][]Rule // desk ID -> added rules
 	allowAll  map[string]bool   // desk ID -> every website allowed
 	pending   map[string]request
+	forward   func(deskID string, ev agent.Event)
+}
+
+// Forward registers fn to see access requests (with their IDs) and decisions, e.g. to
+// show a helper desk's request in the main desk's chat.
+func (m *Manager) Forward(fn func(deskID string, ev agent.Event)) {
+	m.mu.Lock()
+	m.forward = fn
+	m.mu.Unlock()
+}
+
+// HasPending reports whether a desk's agent is waiting for an access decision.
+func (m *Manager) HasPending(deskID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, r := range m.pending {
+		if r.deskID == deskID {
+			return true
+		}
+	}
+	return false
 }
 
 // New returns a Manager and registers it to receive agents' access requests.
@@ -149,8 +170,12 @@ func (m *Manager) onAgentEvent(deskID string, ev *agent.Event) {
 	id := newID()
 	m.mu.Lock()
 	m.pending[id] = request{deskID: deskID, host: ev.Data["host"]}
+	fwd := m.forward
 	m.mu.Unlock()
 	ev.Data["requestId"] = id
+	if fwd != nil {
+		fwd(deskID, *ev)
+	}
 }
 
 // Rules returns the desk's effective rules: charter first, then additions.
@@ -304,11 +329,18 @@ func (m *Manager) Decide(ctx context.Context, d desk.Desk, requestID string, dec
 		return err
 	}
 
-	m.runner.Store().Append(d.ID, agent.Event{
+	decision := agent.Event{
 		Kind: agent.KindAccessDecision,
 		Text: string(dec),
 		Data: map[string]string{"requestId": requestID, "host": req.host, "decision": string(dec)},
-	})
+	}
+	m.runner.Store().Append(d.ID, decision)
+	m.mu.Lock()
+	fwd := m.forward
+	m.mu.Unlock()
+	if fwd != nil {
+		fwd(d.ID, decision)
+	}
 	prompt := fmt.Sprintf("The desk's owner allowed access to %s. Continue the previous task.", req.host)
 	if dec == Deny {
 		prompt = fmt.Sprintf("The desk's owner denied access to %s. Continue without it, or explain what you cannot do.", req.host)

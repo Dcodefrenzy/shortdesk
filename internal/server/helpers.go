@@ -328,6 +328,12 @@ func (h *helpers) finished(task agent.Task, result string, failed bool) {
 	if failed {
 		status = "failed"
 	}
+	// Waiting for the person (a website to allow): the helper keeps the job and goes on
+	// by itself once they answer in the main chat.
+	waiting := s.access.HasPending(task.DeskID)
+	if waiting {
+		status = "waiting"
+	}
 	if strings.TrimSpace(result) == "" {
 		result = "Finished without a summary."
 	}
@@ -337,9 +343,31 @@ func (h *helpers) finished(task agent.Task, result string, failed bool) {
 	if j.Data == nil {
 		j.Data = map[string]any{"title": d.title}
 	}
-	s.scratch(ctx, j, d.name, map[bool]string{false: "Done: ", true: "Stopped: "}[failed]+short(result, 300))
+	prefix := map[string]string{"done": "Done: ", "failed": "Stopped: ", "waiting": "Waiting for you: "}[status]
+	s.scratch(ctx, j, d.name, prefix+short(result, 300))
 	s.tellMain(ctx, j, status, result, task.DeskID)
-	h.release(task.DeskID)
+	if !waiting {
+		h.release(task.DeskID)
+	}
+}
+
+// forward shows a helper's access requests and their answers in the main chat, on the
+// job's card, so the person answers them there.
+func (h *helpers) forward(deskID string, ev agent.Event) {
+	d, ok := h.jobFor(deskID)
+	if !ok {
+		return
+	}
+	main := h.s.mainDesk(context.Background())
+	if main == "" || main == deskID {
+		return
+	}
+	data := map[string]string{"desk": deskID, "job": d.jobID}
+	for k, v := range ev.Data {
+		data[k] = v
+	}
+	ev.Data, ev.TaskID, ev.Seq = data, "helper:"+d.jobID, 0
+	h.s.agent.Store().Append(main, ev)
 }
 
 // reap removes helpers that have had nothing to do for a while, and forgets ones

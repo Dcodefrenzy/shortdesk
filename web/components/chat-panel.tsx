@@ -213,7 +213,15 @@ function TaskBlock({
   onOpenOutput: (path: string) => void;
   onWatchDesk?: (deskId: string) => void;
 }) {
-  if (t.helper?.length) return <HelperCard news={t.helper} onWatch={onWatchDesk} />;
+  if (t.helper?.length)
+    return (
+      <div className="space-y-2 pt-2">
+        <HelperCard news={t.helper} onWatch={onWatchDesk} />
+        {t.cards.map((ev) => (
+          <AccessRequestCard key={ev.seq} deskId={deskId} ev={ev} decision={decisions[ev.data?.requestId ?? ""]} />
+        ))}
+      </div>
+    );
   const failedWithoutAnswer = t.status === "failed" && !t.answer;
   const lastError = [...t.steps].reverse().find((s) => s.kind === "error");
   return (
@@ -265,14 +273,17 @@ function HelperCard({ news, onWatch }: { news: AgentEvent[]; onWatch?: (deskId: 
   const state = last.data?.state ?? "started";
   const title = last.data?.title ?? "A job";
   const helperDesk = news.find((n) => n.data?.desk)?.data?.desk;
-  const tone = state === "done" ? "border-l-ok" : state === "failed" ? "border-l-danger" : "border-l-accent";
+  const tone =
+    state === "done" ? "border-l-ok" : state === "failed" ? "border-l-danger" : state === "waiting" ? "border-l-warn" : "border-l-accent";
   return (
     <div className={`space-y-1.5 rounded-lg border border-l-4 border-border bg-surface px-3 py-2.5 text-sm ${tone}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <span aria-hidden>{state === "done" ? "✅" : state === "failed" ? "⚠️" : "🔵"}</span>
+        <span aria-hidden>{state === "done" ? "✅" : state === "failed" ? "⚠️" : state === "waiting" ? "✋" : "🔵"}</span>
         <b className="min-w-0 flex-1">{title}</b>
-        <span className="font-mono text-xs text-muted">{state === "started" ? "a helper desk is on it" : state}</span>
-        {helperDesk && state === "started" && onWatch && (
+        <span className="font-mono text-xs text-muted">
+          {state === "started" ? "a helper desk is on it" : state === "waiting" ? "waiting for you" : state}
+        </span>
+        {helperDesk && (state === "started" || state === "waiting") && onWatch && (
           <Button onClick={() => onWatch(helperDesk)}>Watch</Button>
         )}
       </div>
