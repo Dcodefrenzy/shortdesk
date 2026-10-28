@@ -24,12 +24,13 @@ func (s *Server) startTask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	t, err := s.agent.Start(d.ID, req.Prompt)
+	// While the agent works, the message waits its turn instead of being refused.
+	t, queued, err := s.agent.Send(d.ID, req.Prompt)
 	switch {
-	case errors.Is(err, agent.ErrBusy):
-		writeError(w, http.StatusConflict, err)
 	case err != nil:
 		writeError(w, http.StatusBadRequest, err)
+	case queued:
+		writeJSON(w, http.StatusAccepted, map[string]any{"queued": true, "waiting": s.agent.Queued(d.ID)})
 	default:
 		writeJSON(w, http.StatusAccepted, t)
 	}

@@ -176,6 +176,7 @@ function MainChat({
       onOpenOutput={onOpenOutput}
       onOpenProject={onOpenProject}
       onTakeOver={onTakeOver}
+      waiting={desk.waiting}
     />
   );
 }

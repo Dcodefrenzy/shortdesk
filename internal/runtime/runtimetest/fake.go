@@ -23,6 +23,9 @@ type Fake struct {
 	EndpointFor func(id string, port int) runtime.Endpoint
 	// ExecOutput is written to ExecRequest.Stdout by every Exec.
 	ExecOutput string
+	// ExecFunc, when set, decides the output instead (it may block, e.g. to keep a
+	// task running).
+	ExecFunc func(runtime.ExecRequest) string
 }
 
 var _ runtime.Runtime = (*Fake)(nil)
@@ -94,7 +97,11 @@ func (f *Fake) Exec(_ context.Context, _ string, r runtime.ExecRequest) error {
 	f.mu.Lock()
 	f.Execs = append(f.Execs, r)
 	out := f.ExecOutput
+	fn := f.ExecFunc
 	f.mu.Unlock()
+	if fn != nil {
+		out = fn(r)
+	}
 	if r.Stdout != nil {
 		r.Stdout.Write([]byte(out))
 	}

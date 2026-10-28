@@ -157,6 +157,8 @@ type deskJSON struct {
 	State     string     `json:"state"`
 	CreatedAt time.Time  `json:"createdAt"`
 	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+	// Waiting are messages queued for the agent while it works.
+	Waiting []string `json:"waiting"`
 	// Agent is the desk's agent state: idle, working or paused.
 	Agent agent.State `json:"agent"`
 	// ViewerURL is relative to this server: the desk's screen, through the proxy.
@@ -169,7 +171,7 @@ func (s *Server) toJSON(d desk.Desk) deskJSON {
 	j := deskJSON{
 		ID: d.ID, Name: d.Name, Charter: d.Charter, Tenant: d.Tenant, State: d.State,
 		CreatedAt: d.CreatedAt, ViewerURL: viewerPath(d.ID), Agent: s.agent.Store().State(d.ID),
-		Tasks: s.agent.Store().TaskCount(d.ID),
+		Tasks: s.agent.Store().TaskCount(d.ID), Waiting: s.agent.Queued(d.ID),
 	}
 	if !d.ExpiresAt.IsZero() {
 		j.ExpiresAt = &d.ExpiresAt

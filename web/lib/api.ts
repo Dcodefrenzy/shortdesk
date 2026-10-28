@@ -13,6 +13,8 @@ export type Desk = {
   agent: AgentState;
   viewerUrl: string;
   tasks: number;
+  // Messages waiting for the agent to finish its current task.
+  waiting: string[];
 };
 
 export type Charter = {

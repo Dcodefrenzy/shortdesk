@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -391,5 +392,65 @@ func TestRunnerExplainsKnownFailures(t *testing.T) {
 		if ev.Kind == KindHelp {
 			t.Errorf("help on a successful task: %+v", ev)
 		}
+	}
+}
+
+func TestMessagesWaitWhileTheAgentWorks(t *testing.T) {
+	r, rt := newTestRunner(sampleRun)
+	release := make(chan struct{})
+	var mu sync.Mutex
+	var prompts []string
+	rt.ExecFunc = func(req runtime.ExecRequest) string {
+		mu.Lock()
+		prompts = append(prompts, req.Env["SHORTDESK_PROMPT"])
+		first := len(prompts) == 1
+		mu.Unlock()
+		if first {
+			<-release // the first task keeps working until released
+		}
+		return sampleRun
+	}
+	var finished []string
+	r.AfterTask(func(task Task, result string, failed bool) {
+		mu.Lock()
+		finished = append(finished, task.Prompt+"="+result)
+		mu.Unlock()
+	})
+
+	if _, queued, err := r.Send("d", "apply to flats"); err != nil || queued {
+		t.Fatalf("first send: queued=%v err=%v", queued, err)
+	}
+	for _, p := range []string{"did Kreuzberg reply?", "also include Mitte"} {
+		if _, queued, err := r.Send("d", p); err != nil || !queued {
+			t.Fatalf("send %q while busy: queued=%v err=%v", p, queued, err)
+		}
+	}
+	if got := strings.Join(r.Queued("d"), " | "); got != "did Kreuzberg reply? | also include Mitte" {
+		t.Errorf("queued = %q", got)
+	}
+	close(release)
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		mu.Lock()
+		n := len(finished)
+		mu.Unlock()
+		if n == 3 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("finished = %v", finished)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if got := strings.Join(prompts, " | "); got != "apply to flats | did Kreuzberg reply? | also include Mitte" {
+		t.Errorf("ran in order %q", got)
+	}
+	if finished[0] != "apply to flats=Done" {
+		t.Errorf("finished = %v", finished)
+	}
+	if len(r.Queued("d")) != 0 {
+		t.Errorf("queue not empty")
 	}
 }

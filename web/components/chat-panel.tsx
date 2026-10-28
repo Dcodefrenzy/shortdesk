@@ -17,9 +17,11 @@ type Props = {
   onOpenOutput: (path: string) => void;
   onOpenProject: (name: string) => void;
   onTakeOver: () => void;
+  // Messages waiting for the agent to finish its current task.
+  waiting?: string[];
 };
 
-export function ChatPanel({ deskId, events, agent, outputs, toMerge, onOpenOutput, onOpenProject, onTakeOver }: Props) {
+export function ChatPanel({ deskId, events, agent, outputs, toMerge, onOpenOutput, onOpenProject, onTakeOver, waiting = [] }: Props) {
   const [prompt, setPrompt] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -42,7 +44,7 @@ export function ChatPanel({ deskId, events, agent, outputs, toMerge, onOpenOutpu
 
   async function send() {
     const text = prompt.trim();
-    if (!text || agent !== "idle") return;
+    if (!text) return;
     setSending(true);
     setError("");
     try {
@@ -102,6 +104,14 @@ export function ChatPanel({ deskId, events, agent, outputs, toMerge, onOpenOutpu
               </ul>
             </div>
           )}
+          {waiting.map((w, i) => (
+            <div key={i} className="flex justify-end">
+              <div className="max-w-[85%] text-right">
+                <p className="rounded-2xl border border-dashed border-accent px-4 py-2 text-left text-sm whitespace-pre-wrap">{w}</p>
+                <span className="text-xs text-muted">waiting · goes next when the agent finishes</span>
+              </div>
+            </div>
+          ))}
           <div ref={bottom} />
         </div>
       </div>
@@ -146,11 +156,14 @@ export function ChatPanel({ deskId, events, agent, outputs, toMerge, onOpenOutpu
                 }
               }}
               rows={2}
-              disabled={agent !== "idle"}
-              placeholder={agent === "idle" ? "Give the agent a task…  (Enter to send, Shift+Enter for a new line)" : "Wait for the current task to finish…"}
+              placeholder={
+                agent === "idle"
+                  ? "Give the agent a task…  (Enter to send, Shift+Enter for a new line)"
+                  : "The agent is working. Send anyway: your message goes next."
+              }
               className="min-h-11 flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent disabled:opacity-60"
             />
-            <Button type="submit" variant="primary" disabled={!prompt.trim() || agent !== "idle" || sending}>
+            <Button type="submit" variant="primary" disabled={!prompt.trim() || sending}>
               {sending ? <Spinner /> : "Send"}
             </Button>
           </form>

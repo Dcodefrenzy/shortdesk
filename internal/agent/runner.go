@@ -146,6 +146,8 @@ type Runner struct {
 	resting map[string]time.Time // provider name -> skipped until (usage limit)
 	hook    func(deskID string, ev *Event)
 	prepare []func(ctx context.Context, deskID string) map[string]string
+	queue   map[string][]string // desk ID -> messages waiting for the current task to end
+	after   []func(task Task, result string, failed bool)
 	now     func() time.Time
 }
 
@@ -187,8 +189,103 @@ func (r *Runner) Start(deskID, prompt string) (Task, error) {
 	if !ok {
 		return Task{}, ErrBusy
 	}
-	go r.run(task, !first)
+	go func() {
+		r.run(task, !first)
+		r.finished(task)
+		r.startNext(deskID)
+	}()
 	return task, nil
+}
+
+// Send starts prompt as a task, or, while the desk's agent is busy, queues it to run
+// as soon as the current task ends. queued says which happened.
+func (r *Runner) Send(deskID, prompt string) (task Task, queued bool, err error) {
+	prompt = strings.TrimSpace(prompt)
+	if prompt == "" {
+		return Task{}, false, errors.New("prompt is empty")
+	}
+	r.mu.Lock()
+	waiting := len(r.queue[deskID]) > 0
+	r.mu.Unlock()
+	if !waiting {
+		if task, err = r.Start(deskID, prompt); !errors.Is(err, ErrBusy) {
+			return task, false, err
+		}
+	}
+	r.mu.Lock()
+	if r.queue == nil {
+		r.queue = map[string][]string{}
+	}
+	r.queue[deskID] = append(r.queue[deskID], prompt)
+	r.mu.Unlock()
+	return Task{}, true, nil
+}
+
+// Queued returns the messages waiting for a desk's agent, oldest first.
+func (r *Runner) Queued(deskID string) []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string{}, r.queue[deskID]...)
+}
+
+// ClearQueue drops the messages waiting for a desk's agent.
+func (r *Runner) ClearQueue(deskID string) {
+	r.mu.Lock()
+	delete(r.queue, deskID)
+	r.mu.Unlock()
+}
+
+// startNext runs the oldest waiting message, if any.
+func (r *Runner) startNext(deskID string) {
+	r.mu.Lock()
+	q := r.queue[deskID]
+	if len(q) == 0 {
+		r.mu.Unlock()
+		return
+	}
+	next := q[0]
+	if len(q) == 1 {
+		delete(r.queue, deskID)
+	} else {
+		r.queue[deskID] = q[1:]
+	}
+	r.mu.Unlock()
+	if _, err := r.Start(deskID, next); err != nil {
+		r.log.Warn("could not start a waiting message", "desk", deskID, "err", err)
+	}
+}
+
+// AfterTask registers fn to run when any task ends, with its final answer.
+func (r *Runner) AfterTask(fn func(task Task, result string, failed bool)) {
+	r.mu.Lock()
+	r.after = append(r.after, fn)
+	r.mu.Unlock()
+}
+
+func (r *Runner) finished(task Task) {
+	r.mu.Lock()
+	after := r.after
+	r.mu.Unlock()
+	if len(after) == 0 {
+		return
+	}
+	result, failed := "", false
+	for _, ev := range r.store.Events(task.DeskID, 0) {
+		if ev.TaskID != task.ID {
+			continue
+		}
+		switch ev.Kind {
+		case KindResult:
+			result, failed = ev.Text, ev.IsError
+		case KindStatus:
+			if ev.Text == string(StatusFailed) || ev.Text == string(StatusStopped) {
+				failed = true
+			}
+		}
+	}
+	for _, fn := range after {
+		fn(task, result, failed)
+	}
 }
 
 func (r *Runner) run(task Task, cont bool) {
