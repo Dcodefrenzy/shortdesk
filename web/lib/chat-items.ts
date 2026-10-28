@@ -20,6 +20,7 @@ export type TaskView = {
   endedAt?: string;
   cards: AgentEvent[]; // things that need the person (access requests), shown outside the group
   help?: string; // after a failure: what the person can do about it
+  helper?: AgentEvent[]; // news about a job a helper desk does for this desk
 };
 
 // Friendly names for tool calls. Hidden tools return null.
@@ -128,6 +129,9 @@ export function buildTasks(events: AgentEvent[]): TaskView[] {
         break;
       case "help":
         t.help = ev.text;
+        break;
+      case "helper":
+        (t.helper ??= []).push(ev);
         break;
       case "status":
         if (ev.text === "running" || ev.text === "paused" || ev.text === "done" || ev.text === "failed" || ev.text === "stopped") {

@@ -38,7 +38,8 @@ export type EventKind =
   | "log"
   | "help"
   | "access_request"
-  | "access_decision";
+  | "access_decision"
+  | "helper";
 
 export type AccessDecision = "desk" | "charter" | "deny";
 

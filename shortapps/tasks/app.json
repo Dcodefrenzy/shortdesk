@@ -4,6 +4,6 @@
   "icon": "✅",
   "color": "#ffffff",
   "description": "What you've asked for and where each job stands: to do, doing, waiting for you, done.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "collections": ["tasks"]
 }

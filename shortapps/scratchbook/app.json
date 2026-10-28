@@ -1,0 +1,9 @@
+{
+  "id": "scratchbook",
+  "name": "Scratchbook",
+  "icon": "📓",
+  "color": "#ffe8b5",
+  "description": "Short updates from your desks about each job, as they work.",
+  "version": "1.0.0",
+  "collections": ["notes"]
+}

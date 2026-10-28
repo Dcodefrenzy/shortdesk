@@ -53,6 +53,7 @@ type Server struct {
 	vault     *vault.Vault
 	viewer    *viewerProxy
 	phone     *phoneDesk
+	helpers   *helpers
 	codes     loginCodes
 	log       *slog.Logger
 }
@@ -72,6 +73,9 @@ func New(cfg Config, desks *desk.Manager, runner *agent.Runner, ws *workspace.St
 	}
 	s.phone = newPhoneDesk(s)
 	runner.AddPrepare(s.phone.agentEnv)
+	s.helpers = newHelpers(s)
+	runner.AddPrepare(s.helpers.env)
+	runner.AfterTask(s.helpers.finished)
 	if cfg.AccessFile != "" {
 		if err := s.access.Persist(cfg.AccessFile); err != nil {
 			log.Warn("could not load saved website rules", "err", err)

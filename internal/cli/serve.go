@@ -112,6 +112,7 @@ func runServe(cmd *cobra.Command, o serveOptions) error {
 	go app.CaptureLogins(cmd.Context(), loginCaptureEvery)
 	go app.RefreshDesks(cmd.Context())
 	go app.KeepPhone(cmd.Context(), 20*time.Second)
+	go app.RunHelpers(cmd.Context(), 5*time.Second)
 
 	ln, err := net.Listen("tcp", o.addr)
 	if err != nil {

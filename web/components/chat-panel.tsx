@@ -19,9 +19,21 @@ type Props = {
   onTakeOver: () => void;
   // Messages waiting for the agent to finish its current task.
   waiting?: string[];
+  onWatchDesk?: (deskId: string) => void;
 };
 
-export function ChatPanel({ deskId, events, agent, outputs, toMerge, onOpenOutput, onOpenProject, onTakeOver, waiting = [] }: Props) {
+export function ChatPanel({
+  deskId,
+  events,
+  agent,
+  outputs,
+  toMerge,
+  onOpenOutput,
+  onOpenProject,
+  onTakeOver,
+  waiting = [],
+  onWatchDesk,
+}: Props) {
   const [prompt, setPrompt] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -85,6 +97,7 @@ export function ChatPanel({ deskId, events, agent, outputs, toMerge, onOpenOutpu
               decisions={decisions}
               files={filesFor(t, outputs)}
               onOpenOutput={onOpenOutput}
+              onWatchDesk={onWatchDesk}
             />
           ))}
           {agent === "idle" && toMerge.length > 0 && (
@@ -191,13 +204,16 @@ function TaskBlock({
   decisions,
   files,
   onOpenOutput,
+  onWatchDesk,
 }: {
   task: TaskView;
   deskId: string;
   decisions: Record<string, AccessDecision>;
   files: Output[];
   onOpenOutput: (path: string) => void;
+  onWatchDesk?: (deskId: string) => void;
 }) {
+  if (t.helper?.length) return <HelperCard news={t.helper} onWatch={onWatchDesk} />;
   const failedWithoutAnswer = t.status === "failed" && !t.answer;
   const lastError = [...t.steps].reverse().find((s) => s.kind === "error");
   return (
@@ -239,6 +255,28 @@ function TaskBlock({
       )}
       {t.status === "stopped" && <p className="text-xs text-muted">■ Stopped</p>}
       {t.status === "paused" && <p className="text-xs text-muted">⏸ You took over the desk</p>}
+    </div>
+  );
+}
+
+// A job a helper desk does for this desk: started, then its result.
+function HelperCard({ news, onWatch }: { news: AgentEvent[]; onWatch?: (deskId: string) => void }) {
+  const last = news.at(-1)!;
+  const state = last.data?.state ?? "started";
+  const title = last.data?.title ?? "A job";
+  const helperDesk = news.find((n) => n.data?.desk)?.data?.desk;
+  const tone = state === "done" ? "border-l-ok" : state === "failed" ? "border-l-danger" : "border-l-accent";
+  return (
+    <div className={`space-y-1.5 rounded-lg border border-l-4 border-border bg-surface px-3 py-2.5 text-sm ${tone}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span aria-hidden>{state === "done" ? "✅" : state === "failed" ? "⚠️" : "🔵"}</span>
+        <b className="min-w-0 flex-1">{title}</b>
+        <span className="font-mono text-xs text-muted">{state === "started" ? "a helper desk is on it" : state}</span>
+        {helperDesk && state === "started" && onWatch && (
+          <Button onClick={() => onWatch(helperDesk)}>Watch</Button>
+        )}
+      </div>
+      {state !== "started" && last.text && <Markdown text={last.text} />}
     </div>
   );
 }

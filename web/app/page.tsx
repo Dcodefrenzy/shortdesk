@@ -110,6 +110,7 @@ function Dashboard() {
                 onOpenOutput={(path) => openApp("files", path)}
                 onOpenProject={(name) => openApp("files", PROJECT + name)}
                 onTakeOver={() => watch(main.id)}
+                onWatchDesk={watch}
               />
             ) : (
               desks && (
@@ -157,11 +158,13 @@ function MainChat({
   onOpenOutput,
   onOpenProject,
   onTakeOver,
+  onWatchDesk,
 }: {
   desk: Desk;
   onOpenOutput: (path: string) => void;
   onOpenProject: (name: string) => void;
   onTakeOver: () => void;
+  onWatchDesk: (deskId: string) => void;
 }) {
   const { events, agent } = useDeskEvents(desk.id);
   const { data: outputs = [] } = useOutputs(desk.id, agent);
@@ -177,6 +180,7 @@ function MainChat({
       onOpenProject={onOpenProject}
       onTakeOver={onTakeOver}
       waiting={desk.waiting}
+      onWatchDesk={onWatchDesk}
     />
   );
 }

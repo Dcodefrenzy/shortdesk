@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scratchbook</title>
+<style>
+  :root { --background: #f5f6f7; --surface: #fff; --foreground: #15181b; --muted: #62686f; --border: #e2e5e8;
+          --accent: #1d7a63; --accent-foreground: #fff; --warn: #a8640f; --danger: #c2372d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 10px; background: var(--background); color: var(--foreground);
+         font: 14px/1.45 "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .job { width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+         padding: 10px 12px; margin-bottom: 6px; display: grid; gap: 2px; }
+  .job b { font-weight: 600; }
+  .job small, .meta { color: var(--muted); font-size: 12px; }
+  .head { display: flex; align-items: center; gap: 8px; margin: 2px 2px 10px; }
+  .head button { border: 0; background: none; color: var(--accent); font-weight: 600; padding: 4px 0; }
+  .note { display: grid; grid-template-columns: 30px 1fr; gap: 8px; margin-bottom: 10px; }
+  .av { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font: 600 11px ui-monospace, monospace;
+        background: var(--surface); border: 1px solid var(--border); }
+  .av.main { color: var(--accent); }
+  .text { white-space: pre-wrap; word-break: break-word; }
+  .empty { color: var(--muted); text-align: center; padding: 40px 14px; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<script src="shortapps.js"></script>
+<script>
+  // A note: { task, title, from: "<desk>", text }.
+  let notes = [], current = null;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const when = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  async function load() {
+    notes = await shortapps.list("notes", { orderBy: [{ field: "_created" }], limit: 1000 }).catch(() => []);
+    render();
+  }
+  function jobs() {
+    const by = new Map();
+    for (const n of notes) {
+      const k = n.data.task || "main";
+      if (!by.has(k)) by.set(k, { title: n.data.title || "Main desk", notes: [] });
+      by.get(k).notes.push(n);
+    }
+    return [...by.entries()].sort((a, b) => b[1].notes.at(-1).created.localeCompare(a[1].notes.at(-1).created));
+  }
+  function render() {
+    const js = jobs();
+    if (current) {
+      const job = js.find(([k]) => k === current);
+      if (!job) { current = null; return render(); }
+      $("view").innerHTML = `<div class="head"><button data-back>‹ All jobs</button><b>${esc(job[1].title)}</b></div>` +
+        job[1].notes.map((n) => {
+          const from = n.data.from || "desk", main = from.startsWith("main");
+          return `<div class="note"><span class="av ${main ? "main" : ""}">${esc(main ? "M" : from.replace(/^helper-?/, "H").slice(0, 3))}</span>
+            <div><div class="meta">${esc(from)} · ${when(n.created)}</div><div class="text">${esc(n.data.text)}</div></div></div>`;
+        }).join("");
+      scrollTo(0, document.body.scrollHeight);
+      return;
+    }
+    $("view").innerHTML = js.length ? js.map(([k, j]) => {
+      const last = j.notes.at(-1);
+      return `<button class="job" data-job="${esc(k)}"><b>${esc(j.title)}</b><small>${esc(last.data.from || "")} · ${when(last.created)} · ${esc(last.data.text).slice(0, 80)}</small></button>`;
+    }).join("") : `<p class="empty">No jobs yet. When your agent hands work to a helper desk, its updates show up here.</p>`;
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-job],[data-back]");
+    if (!b) return;
+    current = b.dataset.job || null;
+    render();
+  });
+  shortapps.onChange(load);
+  shortapps.ready.then(load);
+</script>
+</body>
+</html>

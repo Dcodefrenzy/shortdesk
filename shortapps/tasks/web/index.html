@@ -33,7 +33,8 @@
   .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .status { font: 500 11px "IBM Plex Mono", ui-monospace, monospace; border-radius: 6px; padding: 1px 7px;
             background: var(--background); border: 1px solid var(--border); }
-  .s-doing { color: var(--accent); } .s-waiting { color: var(--warn); }
+  .s-doing, .s-queued { color: var(--accent); } .s-waiting { color: var(--warn); } .s-failed { color: var(--danger); }
+  .result { margin-top: 6px; font-size: 13px; background: var(--background); border-radius: 8px; padding: 6px 8px; white-space: pre-wrap; }
   .edit { grid-column: 1 / -1; display: grid; gap: 6px; }
   .edit .row { display: flex; gap: 6px; flex-wrap: wrap; }
   .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
@@ -47,7 +48,8 @@
 <div id="list"></div>
 <script src="shortapps.js"></script>
 <script>
-  const STATUSES = [["todo", "To do"], ["doing", "Doing"], ["waiting", "Waiting for you"], ["done", "Done"]];
+  const STATUSES = [["waiting", "Waiting for you"], ["doing", "Doing"], ["queued", "Queued for a helper"], ["todo", "To do"],
+                    ["failed", "Didn't finish"], ["done", "Done"]];
   let tasks = [], show = "open", open = null;
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -63,10 +65,11 @@
   async function run(fn) { try { await fn(); } catch (e) { fail(e); } await load(); }
 
   function render() {
-    const counts = { open: tasks.filter((t) => t.data.status !== "done").length, done: tasks.filter((t) => t.data.status === "done").length };
+    const closed = (t) => t.data.status === "done" || t.data.status === "failed";
+    const counts = { open: tasks.filter((t) => !closed(t)).length, done: tasks.filter(closed).length };
     $("chips").innerHTML = [["open", "Open " + counts.open], ["done", "Done " + counts.done], ["all", "All " + tasks.length]]
       .map(([k, l]) => `<button class="chip" data-show="${k}" aria-pressed="${show === k}">${l}</button>`).join("");
-    const visible = tasks.filter((t) => show === "all" || (show === "done") === (t.data.status === "done"));
+    const visible = tasks.filter((t) => show === "all" || (show === "done") === closed(t));
     if (!visible.length) { $("list").innerHTML = `<p class="empty">${tasks.length ? "Nothing here." : "No tasks yet. Ask your agent for something, or add one above."}</p>`; return; }
     $("list").innerHTML = STATUSES.map(([s, label]) => {
       const group = visible.filter((t) => (t.data.status || "todo") === s);
@@ -80,8 +83,10 @@
     return `<li class="${s === "done" ? "done" : ""}">
       <button class="tick" data-tick="${t.id}" aria-label="${s === "done" ? "Mark not done" : "Mark done"}"></button>
       <div data-open="${t.id}" style="cursor:pointer"><div class="title">${esc(d.title)}</div>
-        <div class="meta">${d.desk ? esc(d.desk) + " · " : ""}${esc(t.updatedBy)} · ${ago(t.updated)}${d.notes && !editing ? " · " + esc(d.notes).slice(0, 80) : ""}</div></div>
+        <div class="meta">${d.desk ? "🖥 " + esc(d.desk) + " · " : ""}${esc(t.updatedBy)} · ${ago(t.updated)}${d.notes && !editing ? " · " + esc(d.notes).slice(0, 80) : ""}</div>
+        ${d.result && !editing ? `<div class="result">${esc(d.result).slice(0, 400)}</div>` : ""}</div>
       <span class="status s-${s}">${s}</span>
+      ${editing && d.instructions ? `<div class="result" style="grid-column:1/-1"><b>Instructions for the helper</b>\n${esc(d.instructions)}</div>` : ""}
       ${editing ? `<form class="edit" data-edit="${t.id}">
         <input name="title" value="${esc(d.title)}" aria-label="Title">
         <textarea name="notes" rows="3" placeholder="Notes" aria-label="Notes">${esc(d.notes)}</textarea>

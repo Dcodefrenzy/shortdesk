@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shortdesk/shortdesk/internal/agent"
 	"github.com/shortdesk/shortdesk/internal/desk"
 	"github.com/shortdesk/shortdesk/internal/phone"
 	"github.com/shortdesk/shortdesk/internal/runtime"
@@ -213,10 +214,15 @@ func (p *phoneDesk) agentEnv(ctx context.Context, deskID string) map[string]stri
 	if err != nil {
 		return nil
 	}
-	return map[string]string{
+	env := map[string]string{
 		"SHORTDESK_PHONE_URL": url,
 		"SHORTDESK_PHONE_KEY": phone.AgentKey(p.key(), d.Name, agentKeyTTL, time.Now()),
+		"SHORTDESK_DESK_NAME": d.Name,
 	}
+	if deskID == main {
+		env[agent.ExtraPromptEnv] = mainDeskNote
+	}
+	return env
 }
 
 // ServeHTTP forwards /phone/… to the Phone Desk on the main desk: the phone itself and

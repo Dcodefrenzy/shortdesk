@@ -158,6 +158,10 @@ func (r *Runner) SetEventHook(fn func(deskID string, ev *Event)) {
 	r.mu.Unlock()
 }
 
+// ExtraPromptEnv, returned by a prepare function, adds to the agent's instructions
+// instead of being set in its environment.
+const ExtraPromptEnv = "SHORTDESK_EXTRA_PROMPT"
+
 // AddPrepare registers fn to run before each attempt at a task; the environment it
 // returns is given to the agent (e.g. the key for the person's apps).
 func (r *Runner) AddPrepare(fn func(ctx context.Context, deskID string) map[string]string) {
@@ -401,6 +405,10 @@ func (r *Runner) attempt(ctx context.Context, task Task, cont bool, p Provider) 
 	r.mu.Unlock()
 	for _, fn := range prepare {
 		for k, v := range fn(ctx, task.DeskID) {
+			if k == ExtraPromptEnv {
+				env["SHORTDESK_SYSTEM_PROMPT"] += "\n" + v
+				continue
+			}
 			env[k] = v
 		}
 	}

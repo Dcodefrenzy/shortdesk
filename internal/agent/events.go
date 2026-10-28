@@ -29,6 +29,10 @@ const (
 	KindAccessRequest Kind = "access_request"
 	// KindAccessDecision is a human answering a request. Data: requestId, host, decision.
 	KindAccessDecision Kind = "access_decision"
+
+	// KindHelper is news about a job a helper desk is doing for this desk.
+	// Data: job, title, state (started, done, failed), desk (the helper's ID).
+	KindHelper Kind = "helper"
 )
 
 // accessRequestMarker starts the line printed by the desk's shortdesk-request-access.

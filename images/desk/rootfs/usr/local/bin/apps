@@ -31,6 +31,14 @@ Talking to the person
                                               separated by |
   apps task "<title>" [todo|doing|waiting|done]   add to Tasks
 
+Helper desks (for long jobs, so the main desk stays free to talk)
+  apps helper "<title>" "<instructions>" [--charter <name>] [--hours <n>]
+                                              hand a job to a helper desk: Shortdesk starts
+                                              one, runs it there, and reports back. Give the
+                                              helper everything it needs in <instructions>
+  apps note "<text>"                          post a short update about your current job in
+                                              the Scratchbook (at each milestone, one line)
+
 Building apps (on your desk, then install)
   apps new <id> "<Name>" [emoji]              start one in ~/Developer/apps/<id>
   apps install <folder>                       install or update it on the phone
@@ -98,6 +106,23 @@ case "$cmd" in
     [ $# -ge 1 ] || die 'usage: apps task "<title>" [todo|doing|waiting|done]'
     api POST /api/apps/tasks/data/tasks "$(jq -cn --arg t "$1" --arg s "${2:-todo}" '{data: {title: $t, status: $s}}')" \
       | jq -r '"Added to Tasks: \(.id)"' ;;
+  helper)
+    [ $# -ge 2 ] || die 'usage: apps helper "<title>" "<instructions>" [--charter <name>] [--hours <n>]'
+    title="$1" instructions="$2"; shift 2
+    charter="" hours=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --charter) charter="${2:-}"; shift 2 ;;
+        --hours) hours="${2:-}"; shift 2 ;;
+        *) die "unknown option $1" ;;
+      esac
+    done
+    api POST /api/apps/tasks/data/tasks "$(jq -cn --arg t "$title" --arg i "$instructions" --arg c "$charter" --arg h "$hours"       '{data: ({title: $t, status: "queued", runOn: "helper", instructions: $i, by: "main desk"}
+               + (if $c != "" then {charter: $c} else {} end)
+               + (if $h != "" then {hours: ($h | tonumber)} else {} end))}')"       | jq -r '"Handed to a helper desk (task \(.id)). Shortdesk starts it and reports back in the chat."' ;;
+  note)
+    [ $# -ge 1 ] || die 'usage: apps note "<text>"'
+    api POST /api/apps/scratchbook/data/notes "$(jq -cn --arg x "$1" --arg t "${SHORTDESK_TASK_ID:-main}"       --arg ti "${SHORTDESK_TASK_TITLE:-Main desk}" --arg f "${SHORTDESK_DESK_NAME:-desk}"       '{data: {task: $t, title: $ti, from: $f, text: $x}}')" >/dev/null && echo "Noted." ;;
   new)
     [ $# -ge 2 ] || die 'usage: apps new <id> "<Name>" [emoji]'
     id="$1" name="$2" icon="${3:-🧩}"
