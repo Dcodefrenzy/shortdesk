@@ -6,3 +6,5 @@ internal/webui/dist/*
 !internal/webui/dist/README.md
 # Built by `make desk-binary` for the desk image.
 images/desk/rootfs/usr/local/bin/shortdesk
+internal/phoneweb/dist/*
+!internal/phoneweb/dist/README.md

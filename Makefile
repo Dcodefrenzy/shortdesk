@@ -6,10 +6,13 @@ DESK_IMAGE ?= shortdesk/desk:dev
 
 all: web build ## Dashboard + binary (what releases are built with)
 
-web: ## Build the dashboard and bundle it into the binary's sources
+web: ## Build the dashboard and the phone, and bundle them into the binary's sources
 	cd web && npm ci --no-audit --no-fund && npm run build
 	find internal/webui/dist -mindepth 1 -not -name README.md -exec rm -rf {} +
 	cp -R web/out/. internal/webui/dist/
+	cd web && SHORTDESK_BUILD=phone npm run build
+	find internal/phoneweb/dist -mindepth 1 -not -name README.md -exec rm -rf {} +
+	cp -R web/out/. internal/phoneweb/dist/
 
 build: ## Build the shortdesk binary into bin/ (bundles whatever `make web` produced)
 	go build -ldflags "$(LDFLAGS)" -o bin/shortdesk ./cmd/shortdesk

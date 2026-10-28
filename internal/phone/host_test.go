@@ -27,7 +27,7 @@ type env struct {
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
-	shell := fstest.MapFS{"phone/index.html": {Data: []byte("<p>phone</p>")}, "_next/app.js": {Data: []byte("js")}}
+	shell := fstest.MapFS{"index.html": {Data: []byte("<p>phone</p>")}, "_next/app.js": {Data: []byte("js")}}
 	h, err := New(Config{Dir: t.TempDir(), Secret: secret, Builtin: shortapps.Builtin(), Shell: shell, SDK: shortapps.SDK,
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err != nil {
@@ -236,7 +236,9 @@ func TestShellIsServed(t *testing.T) {
 			t.Errorf("%s = %q", p, body)
 		}
 	}
-	if _, body := e.do("GET", "/_next/app.js", "", ""); body != "js" {
-		t.Errorf("asset = %q", body)
+	for _, p := range []string{"/_next/app.js", "/phone/_next/app.js"} {
+		if _, body := e.do("GET", p, "", ""); body != "js" {
+			t.Errorf("%s = %q", p, body)
+		}
 	}
 }

@@ -3,6 +3,8 @@ package server
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"html"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -183,24 +185,39 @@ func (p *phoneDesk) agentEnv(ctx context.Context, deskID string) map[string]stri
 	}
 }
 
-// ServeHTTP forwards /phone/api/… (logged in) and /phone/apps/… (signed paths) to the
-// Phone Desk on the main desk.
+// ServeHTTP forwards /phone/… to the Phone Desk on the main desk: the phone itself and
+// its API (logged in), and app pages (signed paths).
 func (p *phoneDesk) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	main := p.s.mainDesk(r.Context())
 	if main == "" {
-		writeError(w, http.StatusServiceUnavailable, errors.New("start your main desk first; it runs your phone"))
+		p.unavailable(w, r, "Start your main desk first: it runs your phone.")
 		return
 	}
 	ep, err := p.s.desks.Runtime().Endpoint(r.Context(), main, phonePort)
-	if errors.Is(err, desk.ErrNotFound) {
-		writeError(w, http.StatusServiceUnavailable, errors.New("your main desk is gone"))
-		return
-	}
 	if err != nil {
-		writeError(w, http.StatusBadGateway, err)
+		if !errors.Is(err, desk.ErrNotFound) {
+			p.s.log.Warn("phone desk address", "err", err)
+		}
+		p.unavailable(w, r, "Your phone isn't answering. The main desk may be starting; try again in a minute.")
 		return
 	}
 	p.proxy.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), phoneCtxKey{}, ep)))
+}
+
+// unavailable answers when the phone can't be reached: a small page for people, JSON
+// for the phone's own requests.
+func (p *phoneDesk) unavailable(w http.ResponseWriter, r *http.Request, msg string) {
+	if strings.HasPrefix(r.URL.Path, "/phone/api/") || strings.HasPrefix(r.URL.Path, "/phone/_next/") {
+		writeError(w, http.StatusServiceUnavailable, errors.New(msg))
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Retry-After", "20")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	fmt.Fprintf(w, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="20"><title>Your phone</title>
+<body style="margin:0;display:grid;place-items:center;min-height:100vh;font:15px system-ui;background:#0e1113;color:#e7eaec;text-align:center">
+<div style="max-width:300px;padding:24px"><div style="font-size:40px">📱</div><p>%s</p></div>`, html.EscapeString(msg))
 }
 
 // phoneStatus tells the phone page whether apps can be shown.

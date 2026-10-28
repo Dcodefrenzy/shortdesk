@@ -6,6 +6,7 @@ import { PROJECT } from "@/components/artifacts-panel";
 import { ChatPanel } from "@/components/chat-panel";
 import { DesksView } from "@/components/desks-view";
 import { LogoMark } from "@/components/logo";
+import { PhonePage } from "@/components/phone/phone-page";
 import { pending } from "@/components/project-review";
 import { StartDesk } from "@/components/start-desk";
 import { AgentBadge, ErrorNote } from "@/components/ui";
@@ -21,6 +22,8 @@ type View = "chat" | "desktop";
 // The dashboard: chat with your agent (or watch its desks) on the left, and your
 // agent's phone on the right. A link like /?app=tasks opens that app on the phone.
 export default function Home() {
+  // The phone build (SHORTDESK_BUILD=phone) is just the phone.
+  if (process.env.NEXT_PUBLIC_SHORTDESK_BUILD === "phone") return <PhonePage />;
   return (
     <Suspense fallback={null}>
       <Dashboard />

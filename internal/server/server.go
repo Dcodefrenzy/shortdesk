@@ -97,7 +97,7 @@ func (s *Server) Handler() http.Handler {
 	})
 	authed.HandleFunc("GET /api/charters", s.listCharters)
 	authed.HandleFunc("GET /api/phone", s.phoneStatus)
-	authed.Handle("/phone/api/", s.phone)
+	authed.Handle("/phone/", s.phone)
 	authed.HandleFunc("GET /api/desks", s.listDesks)
 	authed.HandleFunc("POST /api/desks", s.createDesk)
 	authed.HandleFunc("GET /api/desks/{id}", s.getDesk)
@@ -134,8 +134,10 @@ func (s *Server) Handler() http.Handler {
 	protected := s.requireAuth(authed)
 	mux.Handle("/api/", protected)
 	mux.Handle("/desks/", protected)
-	mux.Handle("/phone/api/", protected)
-	// App pages load through short-lived signed paths the Phone Desk checks itself.
+	// The phone is served by the Phone Desk on the main desk; Shortdesk checks the login
+	// and passes it through. App pages load through short-lived signed paths the Phone
+	// Desk checks itself.
+	mux.Handle("/phone/", protected)
 	mux.Handle("GET /phone/apps/", s.phone)
 	switch {
 	case s.cfg.WebDir != "":

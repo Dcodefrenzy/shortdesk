@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shortdesk/shortdesk/internal/phone"
-	"github.com/shortdesk/shortdesk/internal/webui"
+	"github.com/shortdesk/shortdesk/internal/phoneweb"
 	"github.com/shortdesk/shortdesk/shortapps"
 )
 
@@ -34,7 +34,7 @@ func newPhoneHostCommand() *cobra.Command {
 			}
 			log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 			h, err := phone.New(phone.Config{Dir: dir, Secret: []byte(secret), Builtin: shortapps.Builtin(),
-				Shell: webui.FS(), SDK: shortapps.SDK, Log: log})
+				Shell: phoneweb.FS(), SDK: shortapps.SDK, Log: log})
 			if err != nil {
 				return err
 			}

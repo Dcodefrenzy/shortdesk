@@ -32,7 +32,7 @@ type Config struct {
 	Dir     string // where apps and their data live (a volume that outlives the desk)
 	Secret  []byte // shared with Shortdesk; signs every key
 	Builtin fs.FS  // apps every phone starts with: <id>/app.json, <id>/web/…
-	Shell   fs.FS  // the phone page and its assets (the built dashboard)
+	Shell   fs.FS  // the phone: index.html and its assets (web built as the phone)
 	SDK     []byte // shortapps.js, served next to every app's page
 	Log     *slog.Logger
 }
@@ -124,7 +124,17 @@ func (h *Host) Handler() http.Handler {
 
 	mux.HandleFunc("GET /apps/{app}/{token}/{file...}", h.serveAppFile)
 	mux.HandleFunc("/", h.serveShell)
-	return mux
+	// The phone is built to live at /phone/ (where Shortdesk shows it); opened directly
+	// on the desk, the same addresses work.
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if rest, ok := strings.CutPrefix(r.URL.Path, "/phone"); ok && (rest == "" || strings.HasPrefix(rest, "/")) {
+			r2 := r.Clone(r.Context())
+			r2.URL.Path = "/" + strings.TrimPrefix(rest, "/")
+			r2.URL.RawPath = ""
+			r = r2
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 type callerKey struct{}
@@ -379,9 +389,10 @@ func (h *Host) serveShell(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no phone page in this build", http.StatusNotFound)
 		return
 	}
+	// Pages are the phone itself (/, /?app=tasks); files with an extension are its assets.
 	name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 	if name == "" || !strings.Contains(path.Base(name), ".") {
-		name = "phone/index.html"
+		name = "index.html"
 	}
 	if _, err := fs.Stat(h.cfg.Shell, name); err != nil {
 		http.NotFound(w, r)
