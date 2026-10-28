@@ -56,6 +56,8 @@ type phoneDesk struct {
 
 type phoneCtxKey struct{}
 
+var errPhoneStarting = errors.New("phone desk is starting")
+
 func newPhoneDesk(s *Server) *phoneDesk {
 	p := &phoneDesk{s: s}
 	p.proxy = &httputil.ReverseProxy{
@@ -74,7 +76,17 @@ func newPhoneDesk(s *Server) *phoneDesk {
 		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			s.log.Warn("phone desk unreachable", "path", r.URL.Path, "err", err)
-			writeError(w, http.StatusBadGateway, errors.New("your phone isn't answering; the main desk may be starting"))
+			p.unavailable(w, r, "Your phone isn't answering. The main desk may be starting; try again in a minute.")
+		},
+		// While a new main desk settles, its sandbox's proxy answers 502/503 itself:
+		// show the same friendly page instead of a bare error.
+		ModifyResponse: func(resp *http.Response) error {
+			if resp.StatusCode == http.StatusBadGateway || resp.StatusCode == http.StatusServiceUnavailable {
+				if !strings.Contains(resp.Header.Get("Content-Type"), "json") {
+					return errPhoneStarting
+				}
+			}
+			return nil
 		},
 	}
 	return p

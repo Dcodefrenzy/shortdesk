@@ -31,22 +31,29 @@ export function Phone({
 }: {
   app?: PhoneApp;
   onHome: () => void;
-  // bare fills the screen without the device frame (on a real phone).
+  // bare fills the whole screen (on a real phone), keeping the phone's look: its edge,
+  // rounded corners, notch and home bar.
   bare?: boolean;
   children: ReactNode;
 }) {
   const { time } = useClock();
   const home = !app;
   return (
-    <div className={bare ? "h-dvh w-full" : "h-[min(800px,calc(100vh-32px))] w-full max-w-[370px] rounded-[46px] bg-[#0b0f0e] p-[11px] shadow-2xl"}>
+    <div
+      className={
+        bare
+          ? "h-dvh w-full rounded-[44px] bg-[#0b0f0e] px-[7px] pt-[max(7px,env(safe-area-inset-top))] pb-[max(7px,env(safe-area-inset-bottom))]"
+          : "h-[min(800px,calc(100dvh-32px))] w-full max-w-[370px] rounded-[46px] bg-[#0b0f0e] p-[11px] shadow-2xl"
+      }
+    >
       <div
-        className={`flex h-full flex-col overflow-hidden ${bare ? "" : "rounded-[36px]"} ${
+        className={`flex h-full flex-col overflow-hidden rounded-[36px] ${
           home ? "bg-gradient-to-b from-[#1d7a63] via-[#13684f] to-[#0b4a3c] text-white" : "bg-background text-foreground"
         }`}
       >
         <div className="flex shrink-0 items-center justify-between px-6 pt-3 pb-1.5 text-[13px] font-semibold">
           <span className="w-12 tabular-nums">{time}</span>
-          <span className={`h-[26px] w-24 rounded-full ${bare ? "" : "bg-[#0b0f0e]"}`} aria-hidden />
+          <span className="h-[26px] w-24 rounded-full bg-[#0b0f0e]" aria-hidden />
           <span className="w-12 text-right text-[11px]">●●● 5G</span>
         </div>
         {app && (

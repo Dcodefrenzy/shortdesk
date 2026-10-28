@@ -164,3 +164,12 @@ func TestShareFoldersAttachesToNewDesks(t *testing.T) {
 		t.Errorf("mounts = %+v", got)
 	}
 }
+
+func TestDesksGetTheOwnersTimezone(t *testing.T) {
+	old := hostTimezone
+	hostTimezone = func() string { return "Europe/Berlin" }
+	t.Cleanup(func() { hostTimezone = old })
+	if got := specFor(mustCharter(t, restricted), "d").Env["TZ"]; got != "Europe/Berlin" {
+		t.Errorf("TZ = %q", got)
+	}
+}

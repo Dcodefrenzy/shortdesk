@@ -9,8 +9,6 @@ desk:
   resources:
     cpu: "2"
     memory: 4Gi
-  env:
-    TZ: Europe/London
 
 permissions:
   network:

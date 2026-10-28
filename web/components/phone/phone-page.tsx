@@ -19,14 +19,22 @@ export function PhonePage() {
   );
 }
 
-const noSubscribe = () => () => {};
-const isSmall = () => window.innerWidth < 520;
+// A phone-sized screen (or a touch tablet held narrow): the phone fills it like a
+// normal app. Anything bigger shows the phone in its frame. Follows rotation and
+// window resizing.
+const phoneScreen = "(max-width: 600px), (pointer: coarse) and (max-width: 900px)";
+function subscribeScreen(cb: () => void) {
+  const mq = matchMedia(phoneScreen);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+const isPhoneScreen = () => matchMedia(phoneScreen).matches;
 
 function Standalone() {
   const router = useRouter();
   const params = useSearchParams();
   const embedded = params.get("embed") === "1";
-  const small = useSyncExternalStore(noSubscribe, isSmall, () => false);
+  const small = useSyncExternalStore(subscribeScreen, isPhoneScreen, () => false);
   const [fileSel, setFileSel] = useState<string | null>(params.get("path"));
   const { data: session, error } = usePoll(api.session, 60000);
   useAuthRedirect(error);
@@ -49,7 +57,11 @@ function Standalone() {
   };
 
   return (
-    <main className={`flex min-h-dvh items-center justify-center ${small && !embedded ? "" : "p-4"} ${embedded ? "bg-transparent" : "bg-background"}`}>
+    <main
+      className={`flex min-h-dvh items-center justify-center ${small && !embedded ? "bg-[#0b0f0e]" : "p-4"} ${
+        embedded ? "bg-transparent" : small ? "" : "bg-background"
+      }`}
+    >
       <AgentPhone
         appId={params.get("app")}
         open={open}

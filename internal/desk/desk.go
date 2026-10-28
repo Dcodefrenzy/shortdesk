@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -130,12 +131,32 @@ func (m *Manager) Up(ctx context.Context, c *charter.Charter, name string) (Desk
 	return fromBox(box), nil
 }
 
+// hostTimezone returns this machine's time zone (e.g. Europe/Berlin), so desks show the
+// owner's local time; "" when it can't tell (desks then use UTC).
+var hostTimezone = func() string {
+	// The system's zone first: it's what the owner's browser and clock show (a TZ set in
+	// one terminal can differ).
+	if p, err := os.Readlink("/etc/localtime"); err == nil {
+		if _, name, ok := strings.Cut(p, "zoneinfo/"); ok {
+			return name
+		}
+	}
+	return os.Getenv("TZ")
+}
+
 // specFor translates a charter into a runtime spec.
 func specFor(c *charter.Charter, name string) runtime.Spec {
+	env := map[string]string{}
+	if tz := hostTimezone(); tz != "" {
+		env["TZ"] = tz // the owner's local time, unless the charter says otherwise
+	}
+	for k, v := range c.Desk.Env {
+		env[k] = v
+	}
 	spec := runtime.Spec{
 		Image:      c.Desk.Image,
 		Entrypoint: []string{Entrypoint},
-		Env:        c.Desk.Env,
+		Env:        env,
 		CPU:        c.Desk.Resources.CPU,
 		Memory:     c.Desk.Resources.Memory,
 		Lifetime:   time.Duration(c.Limits.DeskLifetime),
