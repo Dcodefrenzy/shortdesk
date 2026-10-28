@@ -74,6 +74,7 @@ func newHelpers(s *Server) *helpers { return &helpers{s: s, desks: map[string]*h
 
 // RunHelpers hands queued jobs to helper desks and removes idle ones, until ctx ends.
 func (s *Server) RunHelpers(ctx context.Context, every time.Duration) {
+	s.helpers.adopt(ctx)
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
@@ -398,6 +399,26 @@ func (h *helpers) reap(ctx context.Context) {
 		h.mu.Lock()
 		delete(h.desks, d.deskID)
 		h.mu.Unlock()
+	}
+}
+
+// adopt takes back helper desks left from before a restart: they count as idle, so
+// they're reused or removed like any other.
+func (h *helpers) adopt(ctx context.Context) {
+	desks, err := h.s.desks.List(ctx)
+	if err != nil {
+		return
+	}
+	main := h.s.mainDesk(ctx)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, d := range desks {
+		if d.ID == main || !strings.HasPrefix(d.Name, helperPrefix) {
+			continue
+		}
+		if _, ok := h.desks[d.ID]; !ok {
+			h.desks[d.ID] = &helperState{deskID: d.ID, name: d.Name, idleSince: time.Now()}
+		}
 	}
 }
 

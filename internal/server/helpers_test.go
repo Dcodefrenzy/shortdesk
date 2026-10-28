@@ -206,3 +206,23 @@ func TestHelperQuestionsReachTheMainChat(t *testing.T) {
 		t.Error("the main chat didn't get the decision")
 	}
 }
+
+func TestHelpersAreAdoptedAfterARestart(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+	decode[deskJSON](t, env.do(t, "POST", "/api/desks", `{"charter":"assistant","name":"main"}`, true))
+	left := decode[deskJSON](t, env.do(t, "POST", "/api/desks", `{"charter":"assistant","name":"helper-1"}`, true))
+	decode[deskJSON](t, env.do(t, "POST", "/api/desks", `{"charter":"assistant","name":"mine"}`, true))
+	h := env.server.helpers
+	h.adopt(ctx)
+	if len(h.desks) != 1 || h.desks[left.ID] == nil {
+		t.Fatalf("adopted = %+v", h.desks)
+	}
+	h.desks[left.ID].idleSince = time.Now().Add(-helperIdleTTL - time.Minute)
+	h.reap(ctx)
+	for _, d := range decode[[]deskJSON](t, env.do(t, "GET", "/api/desks", "", true)) {
+		if d.ID == left.ID {
+			t.Error("the leftover helper wasn't removed")
+		}
+	}
+}
