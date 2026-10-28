@@ -3,11 +3,11 @@ package server
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"html"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"html"
 	"net/http"
 	"net/http/httputil"
 	"strconv"
