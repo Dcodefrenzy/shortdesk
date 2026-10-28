@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -106,6 +107,15 @@ func (h *Host) installBuiltin() error {
 func (h *Host) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
+	// The phone asks this when it's opened in the desk's own browser (not through
+	// Shortdesk): there it works without a login, with the agent's rights.
+	mux.HandleFunc("GET /api/session", func(w http.ResponseWriter, r *http.Request) {
+		if !local(r) {
+			writeError(w, http.StatusUnauthorized, errors.New("open the phone through Shortdesk"))
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"authenticated": true, "desk": true})
+	})
 
 	api := http.NewServeMux()
 	api.HandleFunc("GET /api/apps", h.listApps)
@@ -143,12 +153,24 @@ func (h *Host) authed(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		c, err := parseKey(h.cfg.Secret, key, h.now())
+		if key == "" && local(r) {
+			// The desk's own browser: whoever uses it there is acting as the agent.
+			c, err = caller{role: roleAgent, actor: "on the main desk"}, nil
+		}
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, errors.New("this needs a phone key"))
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, c)))
 	})
+}
+
+// local reports whether a request comes from the desk itself (its own browser or
+// tools), not through Shortdesk or the desk network.
+func local(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	ip := net.ParseIP(host)
+	return err == nil && ip != nil && ip.IsLoopback() && r.Header.Get("X-Forwarded-For") == ""
 }
 
 func callerOf(r *http.Request) caller { c, _ := r.Context().Value(callerKey{}).(caller); return c }

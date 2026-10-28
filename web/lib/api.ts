@@ -125,7 +125,8 @@ const desk = (id: string) => `/api/desks/${encodeURIComponent(id)}`;
 export const api = {
   login: (token: string) => request<void>("/api/login", { method: "POST", body: JSON.stringify({ token }) }),
   logout: () => request<void>("/api/logout", { method: "POST" }),
-  session: () => request<{ authenticated: boolean }>("/api/session"),
+  // desk is true when the phone is opened in a desk's own browser (no Shortdesk login).
+  session: () => request<{ authenticated: boolean; desk?: boolean }>("/api/session"),
 
   charters: () => request<Charter[]>("/api/charters"),
 

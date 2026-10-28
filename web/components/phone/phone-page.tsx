@@ -28,7 +28,7 @@ function Standalone() {
   const embedded = params.get("embed") === "1";
   const small = useSyncExternalStore(noSubscribe, isSmall, () => false);
   const [fileSel, setFileSel] = useState<string | null>(params.get("path"));
-  const { error } = usePoll(api.session, 60000);
+  const { data: session, error } = usePoll(api.session, 60000);
   useAuthRedirect(error);
 
   const open = useCallback(
@@ -58,6 +58,7 @@ function Standalone() {
         fileSel={fileSel}
         setFileSel={setFileSel}
         bare={small && !embedded}
+        desk={!!session?.desk}
       />
     </main>
   );

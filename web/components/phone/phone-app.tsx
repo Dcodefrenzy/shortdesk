@@ -20,6 +20,9 @@ export type PhoneHost = {
   fileSel: string | null;
   setFileSel: (p: string | null) => void;
   bare?: boolean;
+  // desk is set when the phone is open in a desk's own browser: only the apps, with
+  // the agent's rights; Shortdesk's own apps (Vault, Settings…) aren't there.
+  desk?: boolean;
 };
 
 async function loadShortApps(): Promise<ShortAppInfo[]> {
@@ -40,16 +43,16 @@ export function AgentPhone(host: PhoneHost) {
   const apps: PhoneApp[] = [
     ...shortApps.map((a) => ({ id: a.id, name: a.name, icon: a.icon, tile: "bg-white", color: a.color, kind: "short" as const, about: a.description })),
     ...soonApps.filter((s) => !shortApps.some((a) => a.id === s.id)),
-    ...systemApps,
+    ...(host.desk ? [] : systemApps),
   ];
   const app = apps.find((a) => a.id === host.appId);
-  const notices = useNotices(ws, desks, main, host);
+  const notices = useNotices(ws, desks, main, host).filter(() => !host.desk);
 
   let screen;
   if (!app) {
     screen = (
       <HomeScreen
-        who={main ? `🤖 Your agent · ${agentWords[main.agent]}` : "🤖 Your agent · not started"}
+        who={host.desk ? "🤖 Your agent's phone · on the main desk" : main ? `🤖 Your agent · ${agentWords[main.agent]}` : "🤖 Your agent · not started"}
         notices={notices}
         apps={apps}
         onOpen={(a) => host.open(a.id)}

@@ -86,7 +86,6 @@ func TestKeysAreRequired(t *testing.T) {
 	e := newEnv(t)
 	now := time.Now()
 	for name, key := range map[string]string{
-		"none":          "",
 		"made up":       "owner.0000",
 		"other secret":  OwnerKey([]byte("another-secret-0123456789")),
 		"expired agent": AgentKey(secret, "one", -time.Minute, now),
@@ -240,5 +239,28 @@ func TestShellIsServed(t *testing.T) {
 		if _, body := e.do("GET", p, "", ""); body != "js" {
 			t.Errorf("%s = %q", p, body)
 		}
+	}
+}
+
+func TestDeskBrowserActsAsTheAgent(t *testing.T) {
+	e := newEnv(t)
+	// httptest serves on 127.0.0.1: the desk's own browser, with no key.
+	if resp, body := e.do("GET", "/api/session", "", ""); resp.StatusCode != 200 || !strings.Contains(body, `"desk":true`) {
+		t.Fatalf("session = %d %s", resp.StatusCode, body)
+	}
+	resp, body := e.do("POST", "/api/apps/tasks/data/tasks", "", `{"data":{"title":"from the desk"}}`)
+	if resp.StatusCode != http.StatusCreated || !strings.Contains(body, `"createdBy":"on the main desk"`) {
+		t.Fatalf("add = %d %s", resp.StatusCode, body)
+	}
+	// Agent rights only.
+	if resp, _ := e.do("DELETE", "/api/apps/tasks", "", ""); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("delete app = %d, want 403", resp.StatusCode)
+	}
+	// Through a proxy (another machine), no key means no access.
+	req, _ := http.NewRequest("GET", e.srv.URL+"/api/apps", nil)
+	req.Header.Set("X-Forwarded-For", "203.0.113.9")
+	r2, _ := http.DefaultClient.Do(req)
+	if r2.StatusCode != http.StatusUnauthorized {
+		t.Errorf("forwarded without key = %d, want 401", r2.StatusCode)
 	}
 }
