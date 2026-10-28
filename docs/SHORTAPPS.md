@@ -54,7 +54,7 @@ from. Never the data, never passwords (those live in the Vault).
 
 ## Build order
 
-1. **Dashboard shell** (now): Chat | Desktop tabs, the phone on the right, and the
+1. **Dashboard shell** (done): Chat | Desktop tabs, the phone on the right, and the
    system apps on today's backend: **Vault** (real Vaultwarden logins, add-login form),
    **Settings** (AI models, router, websites, shared folders, desk software, theme),
    **Files** (what the agent saved), **Store** (what's coming). Onboarding as a
@@ -63,9 +63,10 @@ from. Never the data, never passwords (those live in the Vault).
    data layer (`internal/appdata`), apps served walled off on the phone, the `apps`
    tool for agents (use, message, task, build, install, undo). First apps: Messages,
    Tasks (`shortapps/`).
-3. **Main desk + helpers**: the main desk never expires and orchestrates; it starts
-   helper desks with lifetimes for hard tasks, reads their scratchbooks, and keeps you
-   updated; the chat is always open.
+3. **Main desk + helpers** (done): the main desk never expires and orchestrates; it
+   starts helper desks (up to 3) with lifetimes for long jobs, reads their Scratchbook
+   updates, passes their questions to the main chat, and takes them back after a
+   restart; the chat is always open.
 4. **More apps**: Token usage (spend and limits, a system app), Reminders (with the
    Scheduler and Telegram notifications), Journal, Notes.
 5. **Store apps**: Price watch, Tracker (Berlin flats), Calendar, Contacts, Documents,
