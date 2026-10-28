@@ -122,3 +122,10 @@ type PrivateNetwork interface {
 	// PrivateAddr returns the desk's address on the network desks share.
 	PrivateAddr(ctx context.Context, id string) (string, error)
 }
+
+// Renewer is implemented by runtimes that can move a desk's expiry, e.g. to keep the
+// main desk alive.
+type Renewer interface {
+	// Renew sets when the desk is removed; it returns the time the runtime set.
+	Renew(ctx context.Context, id string, expiresAt time.Time) (time.Time, error)
+}

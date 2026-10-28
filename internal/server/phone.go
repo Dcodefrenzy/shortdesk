@@ -112,13 +112,35 @@ func (p *phoneDesk) key() []byte {
 	return p.secret
 }
 
-// ensure starts the Phone Desk on the main desk if it isn't running.
+// mainDeskLease is how far ahead the main desk's expiry is kept: it never expires while
+// Shortdesk runs, and lasts this long if Shortdesk is stopped.
+const mainDeskLease = 7 * 24 * time.Hour
+
+// keepAlive pushes the main desk's expiry forward once it's within a day of the lease.
+func (p *phoneDesk) keepAlive(ctx context.Context, id string) {
+	rn, ok := p.s.desks.Runtime().(runtime.Renewer)
+	if !ok {
+		return
+	}
+	d, err := p.s.desks.Find(ctx, id)
+	if err != nil || d.ExpiresAt.IsZero() || time.Until(d.ExpiresAt) > mainDeskLease-24*time.Hour {
+		return
+	}
+	if _, err := rn.Renew(ctx, id, time.Now().Add(mainDeskLease)); err != nil {
+		p.s.log.Warn("could not keep the main desk alive", "desk", d.Name, "err", err)
+		return
+	}
+	p.s.log.Info("kept the main desk alive", "desk", d.Name, "until", time.Now().Add(mainDeskLease).Format(time.DateTime))
+}
+
+// ensure keeps the main desk alive and starts the Phone Desk on it if it isn't running.
 func (p *phoneDesk) ensure(ctx context.Context) {
 	main := p.s.mainDesk(ctx)
 	if main == "" {
 		p.setState("")
 		return
 	}
+	p.keepAlive(ctx, main)
 	var out bytes.Buffer
 	err := p.s.desks.Runtime().Exec(ctx, main, runtime.ExecRequest{
 		Command: startPhone,
@@ -152,7 +174,7 @@ func (p *phoneDesk) State() string {
 	return p.state
 }
 
-// KeepPhone keeps the Phone Desk running on whichever desk is the main desk.
+// KeepPhone keeps whichever desk is the main desk alive, with the Phone Desk running.
 func (s *Server) KeepPhone(ctx context.Context, every time.Duration) {
 	t := time.NewTicker(every)
 	defer t.Stop()

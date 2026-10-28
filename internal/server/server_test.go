@@ -499,3 +499,16 @@ func TestMainDesk(t *testing.T) {
 		t.Errorf("after removing the main desk = %q, want %q", got, a.ID)
 	}
 }
+
+func TestMainDeskIsKeptAlive(t *testing.T) {
+	env := newTestEnv(t)
+	d := decode[deskJSON](t, env.do(t, "POST", "/api/desks", `{"charter":"assistant","name":"main"}`, true))
+	if d.ExpiresAt == nil || time.Until(*d.ExpiresAt) > 3*time.Hour {
+		t.Fatalf("new desk expires %v", d.ExpiresAt)
+	}
+	env.server.phone.keepAlive(context.Background(), d.ID)
+	got := decode[deskJSON](t, env.do(t, "GET", "/api/desks/"+d.ID, "", true))
+	if got.ExpiresAt == nil || time.Until(*got.ExpiresAt) < 6*24*time.Hour {
+		t.Errorf("main desk expires %v, want about a week ahead", got.ExpiresAt)
+	}
+}

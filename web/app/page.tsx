@@ -11,7 +11,6 @@ import { pending } from "@/components/project-review";
 import { StartDesk } from "@/components/start-desk";
 import { AgentBadge, ErrorNote } from "@/components/ui";
 import { api, type Desk } from "@/lib/api";
-import { timeLeft } from "@/lib/format";
 import { useAuthRedirect } from "@/lib/use-auth-redirect";
 import { useDeskEvents } from "@/lib/use-desk-events";
 import { useOutputs, useProjects } from "@/lib/use-outputs";
@@ -79,7 +78,7 @@ function Dashboard() {
           <div className="min-w-0">
             <h1 className="font-display text-base leading-tight">Your agent</h1>
             <p className="truncate text-xs text-muted">
-              {main ? `${main.name} · removed in ${timeLeft(main.expiresAt)}` : desks ? "No main desk yet" : "Loading…"}
+              {main ? `${main.name} · always on` : desks ? "No main desk yet" : "Loading…"}
             </p>
           </div>
           {main && <AgentBadge state={main.agent} />}

@@ -307,3 +307,15 @@ func (r *Runtime) PrivateAddr(ctx context.Context, id string) (string, error) {
 	}
 	return "", fmt.Errorf("desk %s has no network address", id)
 }
+
+var _ runtime.Renewer = (*Runtime)(nil)
+
+// Renew moves the sandbox's expiry (the server's creation-time limit doesn't apply).
+func (r *Runtime) Renew(ctx context.Context, id string, expiresAt time.Time) (time.Time, error) {
+	var out struct {
+		ExpiresAt time.Time `json:"expiresAt"`
+	}
+	err := r.do(ctx, http.MethodPost, "/v1/sandboxes/"+url.PathEscape(id)+"/renew-expiration",
+		map[string]string{"expiresAt": expiresAt.UTC().Format(time.RFC3339)}, &out)
+	return out.ExpiresAt, err
+}

@@ -140,3 +140,18 @@ func (f *Files) Download(_ context.Context, id, path string, w io.Writer) error 
 	_, err := w.Write(b)
 	return err
 }
+
+var _ runtime.Renewer = (*Fake)(nil)
+
+// Renew moves a box's expiry.
+func (f *Fake) Renew(_ context.Context, id string, expiresAt time.Time) (time.Time, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.Boxes {
+		if f.Boxes[i].ID == id {
+			f.Boxes[i].ExpiresAt = expiresAt
+			return expiresAt, nil
+		}
+	}
+	return time.Time{}, runtime.ErrNotFound
+}

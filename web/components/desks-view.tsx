@@ -87,8 +87,8 @@ export function DesksView({
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <span className="text-muted">
-              <b className="text-foreground">{desk.name}</b> · {desk.charter} · removed in {timeLeft(desk.expiresAt)}
-              {desk.id === mainId ? " · you chat with this desk" : ""}
+              <b className="text-foreground">{desk.name}</b> · {desk.charter} ·{" "}
+              {desk.id === mainId ? "main desk, always on · you chat with this desk" : `removed in ${timeLeft(desk.expiresAt)}`}
             </span>
             <span className="flex-1" />
             <a href={desk.viewerUrl} target="_blank" rel="noopener" className="text-muted underline hover:text-foreground">

@@ -132,7 +132,8 @@ function useNotices(ws: Workspace | undefined, desks: Desk[] | undefined, main: 
     out.push({ icon: "🔐", title: "Add your first login", text: "So your agent can sign in to sites", action: { label: "Vault", onClick: () => host.open("vault") } });
   if (main && main.tasks === 0 && main.agent === "idle")
     out.push({ icon: "💬", title: "Give your agent a job", text: "Type it in the chat", action: { label: "Chat", onClick: host.chat } });
-  if (main?.expiresAt && minute > 0 && new Date(main.expiresAt).getTime() - minute * 60_000 < 15 * 60_000)
-    out.push({ icon: "⏳", title: "Main desk ends soon", text: `Removed in ${timeLeft(main.expiresAt)}` });
+  // The main desk is kept alive by Shortdesk; this only shows if that stopped working.
+  if (main?.expiresAt && minute > 0 && new Date(main.expiresAt).getTime() - minute * 60_000 < 60 * 60_000)
+    out.push({ icon: "⏳", title: "Main desk ends soon", text: `Removed in ${timeLeft(main.expiresAt)}. Is Shortdesk running?` });
   return out.slice(0, 3);
 }
